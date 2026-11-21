@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, useAnimation } from 'framer-motion';
+import { motion, useMotionValue, useMotionValueEvent, animate } from 'framer-motion';
 import type { Game, Settings } from '../types';
 
 interface FortuneWheelProps {
@@ -10,6 +10,7 @@ interface FortuneWheelProps {
   settings: Settings;
   onSpinStart?: () => void;
   isWinPopupOpen?: boolean;
+  onTick?: (volumeFactor: number) => void;
 }
 
 const FortuneWheel: React.FC<FortuneWheelProps> = ({ 
@@ -19,18 +20,33 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
   setIsSpinning,
   settings,
   onSpinStart,
-  isWinPopupOpen
+  isWinPopupOpen,
+  onTick
 }) => {
-  const controls = useAnimation();
+  const rotate = useMotionValue(0);
   const [totalRotation, setTotalRotation] = useState(0);
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const currentRotationRef = useRef(0);
+  const spinInfoRef = useRef<{ start: number; degrees: number } | null>(null);
+  const lastBoundaryRef = useRef(0);
 
   useEffect(() => {
     currentRotationRef.current = totalRotation;
-    controls.set({ rotate: totalRotation });
-  }, [totalRotation, controls]);
+    rotate.set(totalRotation);
+  }, [totalRotation, rotate]);
+
+  useMotionValueEvent(rotate, 'change', (v) => {
+    const info = spinInfoRef.current;
+    if (!info || !onTick) return;
+    const traveled = info.start - v;
+    const boundary = Math.floor(traveled / sectorAngle);
+    if (boundary > lastBoundaryRef.current) {
+      lastBoundaryRef.current = boundary;
+      const progress = Math.min(Math.max(traveled / info.degrees, 0), 1);
+      onTick(Math.max(0.12, 1 - progress * 0.85));
+    }
+  });
 
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,7 +60,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
         const degreesToAdd = (deltaTime / 1000) * 6;
         
         currentRotationRef.current -= degreesToAdd;
-        controls.set({ rotate: currentRotationRef.current });
+        rotate.set(currentRotationRef.current);
         
         animationFrameRef.current = requestAnimationFrame(animateIdle);
       };
@@ -60,7 +76,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isSpinning, settings.wheel.idleSpin, games.length, controls, isWinPopupOpen]);
+  }, [isSpinning, settings.wheel.idleSpin, games.length, rotate, isWinPopupOpen]);
 
   const spin = async () => {
     if (isSpinning || games.length === 0) return;
@@ -80,11 +96,15 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
     
     const spinDegrees = 1800 + random * 360;
     const newRotation = currentRotationRef.current - spinDegrees;
-    
-    await controls.start({
-      rotate: newRotation,
-      transition: { duration: settings.wheel.spinDuration, ease: [0.22, 1, 0.36, 1] }
+
+    spinInfoRef.current = { start: currentRotationRef.current, degrees: spinDegrees };
+    lastBoundaryRef.current = 0;
+
+    await animate(rotate, newRotation, {
+      duration: settings.wheel.spinDuration,
+      ease: [0.22, 1, 0.36, 1]
     });
+    spinInfoRef.current = null;
 
     setTotalRotation(newRotation);
     setIsSpinning(false);
@@ -138,7 +158,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
   return (
     <div className="mx-auto w-fit overflow-clip [overflow-clip-margin:32px]">
-    <div className="relative w-[min(90vw,70vh,700px)] h-[min(90vw,70vh,700px)] mx-auto">
+    <div className="relative w-[min(90vw,70vh,700px)] h-[min(90vw,70vh,700px)] mx-auto rounded-full shadow-2xl">
       <div 
         className="absolute right-0 top-1/2 translate-x-4 -translate-y-1/2 z-10 w-14 h-10 md:w-16 md:h-12 shadow-xl border-2"
         style={{ 
@@ -149,10 +169,9 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       />
       
       <motion.div
-        animate={controls}
-        initial={{ rotate: 0 }}
-        className="w-full h-full rounded-full border-8 md:border-12 shadow-2xl relative will-change-transform"
-        style={{ 
+        className="w-full h-full rounded-full border-8 md:border-12 relative will-change-transform"
+        style={{
+          rotate,
           borderColor: settings.customization.wheelBorderColor
         }}
       >
