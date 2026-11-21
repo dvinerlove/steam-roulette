@@ -22,15 +22,19 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, x: '100%' }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
           className="fixed inset-0 bg-black/50 z-50"
           onClick={onClose}
         >
-          <div
+          <motion.div
             role="dialog" aria-modal="true" aria-label={t(locale, 'aria.history')}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="absolute right-0 top-0 h-full w-full md:w-[500px] bg-slate-800 border-l border-slate-700 shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -75,7 +79,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -817,15 +817,21 @@ function App() {
           <AnimatePresence>
             {selectedGame && !isSpinning && (
               <motion.div
-                initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 12, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
-                transition={{ type: 'spring', duration: 0.5, bounce: 0.25 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.15, ease: 'easeOut' } }}
+                transition={{ duration: 0.2 }}
                 className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
               >
                 {/* Backdrop */}
                 <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedGame(null)} />
-                <div role="dialog" aria-modal="true" aria-label={t(settings.locale, 'aria.win')} className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
+                <motion.div
+                  role="dialog" aria-modal="true" aria-label={t(settings.locale, 'aria.win')}
+                  initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+                  transition={{ type: 'spring', duration: 0.5, bounce: 0.25 }}
+                  className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
                   <div className="flex justify-end mb-2">
                     <button onClick={() => setSelectedGame(null)} className="text-white/60 hover:text-white transition-colors p-2">
                       <X size={24} />
@@ -890,7 +896,7 @@ function App() {
                     <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl" />
                     <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl" />
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
