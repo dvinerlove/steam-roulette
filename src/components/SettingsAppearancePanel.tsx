@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Settings } from '../types';
 import { Settings as SettingsIcon, Palette, Volume2, VolumeX, Zap } from 'lucide-react';
+import { t, type Locale } from '../i18n';
 
 interface SettingsAppearancePanelProps {
   settings: Settings;
@@ -13,17 +14,18 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
   setSettings,
   clearAll,
 }) => {
+  const loc = settings.locale;
   return (
     <div className="space-y-8">
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
-          <Volume2 size={20} /> Звук
+          <Volume2 size={20} /> {t(loc, 'sound.section')}
         </h3>
         <div className="bg-slate-700/30 rounded-xl p-4 space-y-4">
           <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
             <div className="flex items-center gap-2">
               {settings.sound.enabled ? <Volume2 size={20} className="text-slate-300" /> : <VolumeX size={20} className="text-slate-300" />}
-              <span className="text-slate-300">Включить звук</span>
+              <span className="text-slate-300">{t(loc, 'sound.enable')}</span>
             </div>
             <input type="checkbox" checked={settings.sound.enabled} onChange={(e) => setSettings({ ...settings, sound: { ...settings.sound, enabled: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
           </label>
@@ -31,7 +33,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
           {settings.sound.enabled && (
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between">
-                <label className="text-slate-300 text-sm">Громкость</label>
+                <label className="text-slate-300 text-sm">{t(loc, 'sound.volume')}</label>
                 <span className="text-slate-400 text-sm">{Math.round(settings.sound.volume * 100)}%</span>
               </div>
               <input
@@ -50,16 +52,23 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
 
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
-          <Palette size={20} /> Общий вид
+          <Palette size={20} /> {t(loc, 'appearance.general')}
         </h3>
         <div className="bg-slate-700/30 rounded-xl p-4 space-y-4">
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm font-medium">Фон приложения (макс 1MB)</label>
+            <label className="text-slate-300 text-sm font-medium">{t(loc, 'appearance.language')}</label>
+            <select value={settings.locale} onChange={(e) => setSettings({ ...settings, locale: e.target.value as Locale })} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-slate-300 text-sm font-medium">{t(loc, 'appearance.appBg')}</label>
             <input type="file" accept="image/*" className="hidden" id="bg-upload" onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
                 if (file.size > 1024 * 1024) { // > 1MB
-                  alert('Изображение слишком большое! Максимальный размер 1MB!');
+                  alert(t(loc, 'err.imageTooLarge'));
                   return;
                 }
                 const reader = new FileReader();
@@ -69,9 +78,9 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
             }} />
             <div className="flex gap-2">
               <label htmlFor="bg-upload" className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-center text-slate-300 cursor-pointer hover:bg-slate-600 transition">
-                Загрузить изображение
+                {t(loc, 'appearance.upload')}
               </label>
-              {settings.customization.backgroundImage && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, backgroundImage: undefined } })} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">Сброс</button>}
+              {settings.customization.backgroundImage && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, backgroundImage: undefined } })} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">{t(loc, 'action.reset')}</button>}
             </div>
           </div>
         </div>
@@ -79,16 +88,16 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
 
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
-          <Zap size={20} /> Колесо
+          <Zap size={20} /> {t(loc, 'appearance.wheelSection')}
         </h3>
         <div className="bg-slate-700/30 rounded-xl p-4 space-y-4">
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm">Фон колеса (макс 1MB)</label>
+            <label className="text-slate-300 text-sm">{t(loc, 'appearance.wheelBg')}</label>
             <input type="file" accept="image/*" className="hidden" id="wheel-bg-upload" onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
                 if (file.size > 1024 * 1024) { // > 1MB
-                  alert('Изображение слишком большое! Максимальный размер 1MB!');
+                  alert(t(loc, 'err.imageTooLarge'));
                   return;
                 }
                 const reader = new FileReader();
@@ -105,21 +114,21 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
             }} />
             <div className="flex gap-2">
               <label htmlFor="wheel-bg-upload" className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-center text-slate-300 cursor-pointer hover:bg-slate-600 transition">
-                Загрузить изображение
+                {t(loc, 'appearance.upload')}
               </label>
-              {settings.customization.wheelImage && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, wheelImage: undefined } })} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">Сброс</button>}
+              {settings.customization.wheelImage && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, wheelImage: undefined } })} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">{t(loc, 'action.reset')}</button>}
             </div>
           </div>
 
           <div className="space-y-3 pt-2">
-            <label className="text-slate-300 text-sm font-semibold">Настройки фона колеса</label>
+            <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.wheelBgSettings')}</label>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Цвет подложки</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.bgColor')}</label>
                 <input type="color" value={settings.customization.wheelBgColor} onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, wheelBgColor: e.target.value } })} className="w-full h-10 rounded-lg" />
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Прозр. подложки</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.bgOpacity')}</label>
                 <input
                   type="range"
                   min="0"
@@ -132,7 +141,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.wheelBgOpacity * 100)}%</div>
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Прозр. изображения</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.imgOpacity')}</label>
                 <input
                   type="range"
                   min="0"
@@ -145,7 +154,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.wheelImageOpacity * 100)}%</div>
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Прозр. цветов</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.colorOpacity')}</label>
                 <input
                   type="range"
                   min="0"
@@ -158,7 +167,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.colorOpacity * 100)}%</div>
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Прозр. линий</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.lineOpacity')}</label>
                 <input
                   type="range"
                   min="0"
@@ -175,43 +184,43 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm">Цвет рамки</label>
+              <label className="text-slate-300 text-sm">{t(loc, 'appearance.borderColor')}</label>
               <input type="color" value={settings.customization.wheelBorderColor} onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, wheelBorderColor: e.target.value } })} className="w-full h-10 rounded-lg" />
             </div>
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm">Цвет указателя</label>
+              <label className="text-slate-300 text-sm">{t(loc, 'appearance.pointerColor')}</label>
               <input type="color" value={settings.customization.pointerColor} onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, pointerColor: e.target.value } })} className="w-full h-10 rounded-lg" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm">Время прокрутки (сек)</label>
+            <label className="text-slate-300 text-sm">{t(loc, 'appearance.spinDuration')}</label>
             <input type="number" min="1" max="20" value={settings.wheel.spinDuration} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, spinDuration: Number(e.target.value) } })} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white" />
           </div>
 
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm">Расположение названий</label>
+            <label className="text-slate-300 text-sm">{t(loc, 'appearance.labelPosition')}</label>
             <select value={settings.wheel.textPosition} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textPosition: e.target.value as any } })} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white">
-              <option value="inner">Ближе к центру</option>
-              <option value="middle">Среднее</option>
-              <option value="outer">Ближе к краю</option>
-              <option value="far-outer">Очень близко к краю</option>
+              <option value="inner">{t(loc, 'appearance.posInner')}</option>
+              <option value="middle">{t(loc, 'appearance.posMiddle')}</option>
+              <option value="outer">{t(loc, 'appearance.posOuter')}</option>
+              <option value="far-outer">{t(loc, 'appearance.posFarOuter')}</option>
             </select>
           </div>
 
           <div className="space-y-3 pt-2">
-            <label className="text-slate-300 text-sm font-semibold">Цвет текста на секторах</label>
+            <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.textColor')}</label>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Основной</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.textMain')}</label>
                 <input type="color" value={settings.wheel.textColor} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textColor: e.target.value } })} className="w-full h-10 rounded-lg" />
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Обводка</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.textStroke')}</label>
                 <input type="color" value={settings.wheel.textStrokeColor} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textStrokeColor: e.target.value } })} className="w-full h-10 rounded-lg" />
               </div>
               <div className="space-y-1 col-span-1">
-                <label className="text-slate-400 text-xs">Толщина обводки</label>
+                <label className="text-slate-400 text-xs">{t(loc, 'appearance.strokeWidth')}</label>
                 <input
                   type="number"
                   min="0"
@@ -227,7 +236,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
 
           <div className="space-y-2 pt-3">
             <div className="flex justify-between items-center">
-              <label className="text-slate-300 text-sm font-semibold">Длина названий</label>
+              <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.labelLength')}</label>
               <span className="text-slate-400 text-xs">{Math.round(settings.wheel.textTruncationMultiplier * 100)}%</span>
             </div>
             <input
@@ -240,27 +249,27 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
               className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex justify-between text-slate-500 text-xs">
-              <span>Короче</span>
-              <span>Не обрезать</span>
+              <span>{t(loc, 'appearance.shorter')}</span>
+              <span>{t(loc, 'appearance.noTrunc')}</span>
             </div>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-700">
-            <label className="text-slate-300 text-sm font-semibold">Заголовки страницы</label>
+            <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.pageTitles')}</label>
             <div className="space-y-2">
               <input
                 type="text"
                 value={settings.titles.main}
                 onChange={(e) => setSettings({ ...settings, titles: { ...settings.titles, main: e.target.value } })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
-                placeholder="Основной заголовок"
+                placeholder={t(loc, 'appearance.titlePh')}
               />
               <input
                 type="text"
                 value={settings.titles.subtitle}
                 onChange={(e) => setSettings({ ...settings, titles: { ...settings.titles, subtitle: e.target.value } })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
-                placeholder="Подзаголовок"
+                placeholder={t(loc, 'appearance.subtitlePh')}
               />
             </div>
           </div>
@@ -268,35 +277,35 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
           <div className="pt-4 border-t border-slate-700">
             <button
               onClick={() => {
-                if (confirm('Вы уверены, что хотите сбросить все настройки и очистить список игр?')) {
+                if (confirm(t(loc, 'appearance.resetConfirm'))) {
                   clearAll();
                 }
               }}
               className="w-full bg-red-600/50 hover:bg-red-600 text-slate-100 py-2 px-4 rounded-lg transition-colors"
             >
-              Сбросить всё и очистить список
+              {t(loc, 'appearance.resetAll')}
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-2">
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-              <span className="text-slate-300 text-sm">Показывать названия</span>
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.showNames')}</span>
               <input type="checkbox" checked={settings.wheel.showGameNames} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, showGameNames: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-              <span className="text-slate-300 text-sm">Показывать изображения</span>
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.showImages')}</span>
               <input type="checkbox" checked={settings.wheel.showImages} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, showImages: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-              <span className="text-slate-300 text-sm">Показывать цвета</span>
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.showColors')}</span>
               <input type="checkbox" checked={settings.wheel.showColors} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, showColors: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-              <span className="text-slate-300 text-sm">Линии секторов</span>
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.sectorLines')}</span>
               <input type="checkbox" checked={settings.wheel.showSectorLines} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, showSectorLines: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg col-span-2">
-              <span className="text-slate-300 text-sm">Idle спин</span>
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.idleSpin')}</span>
               <input type="checkbox" checked={settings.wheel.idleSpin} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, idleSpin: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
           </div>
@@ -305,20 +314,20 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
 
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
-          <SettingsIcon size={20} /> Кнопка Spin
+          <SettingsIcon size={20} /> {t(loc, 'appearance.spinBtn')}
         </h3>
         <div className="bg-slate-700/30 rounded-xl p-4 space-y-4">
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm">Текст</label>
+            <label className="text-slate-300 text-sm">{t(loc, 'appearance.text')}</label>
             <input type="text" value={settings.spinButton.text} onChange={(e) => setSettings({ ...settings, spinButton: { ...settings.spinButton, text: e.target.value } })} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm">Фон кнопки</label>
+              <label className="text-slate-300 text-sm">{t(loc, 'appearance.btnBg')}</label>
               <input type="color" value={settings.spinButton.backgroundColor} onChange={(e) => setSettings({ ...settings, spinButton: { ...settings.spinButton, backgroundColor: e.target.value } })} className="w-full h-10 rounded-lg" />
             </div>
             <div className="space-y-2">
-              <label className="text-slate-300 text-sm">Цвет текста</label>
+              <label className="text-slate-300 text-sm">{t(loc, 'appearance.btnTextColor')}</label>
               <input type="color" value={settings.spinButton.textColor} onChange={(e) => setSettings({ ...settings, spinButton: { ...settings.spinButton, textColor: e.target.value } })} className="w-full h-10 rounded-lg" />
             </div>
           </div>

@@ -1,4 +1,5 @@
 import type { Settings } from '../types';
+import { t, formatPrice } from '../i18n';
 
 interface SteamPriceData {
   price?: string;
@@ -53,7 +54,7 @@ export const normalizeStringForComparison = (s: string): string =>
 
 export async function fetchSteamPrice(
   appId: string, 
-  settings: Pick<Settings, 'steam'>
+  settings: Pick<Settings, 'steam' | 'locale'>
 ): Promise<SteamPriceData | undefined> {
   try {
     if (!settings.steam.enableIntegration) return undefined;
@@ -68,21 +69,13 @@ export async function fetchSteamPrice(
         if (data) {
           const result: SteamPriceData = {};
           
-          // Format price with currency
-          const currencySymbol = {
-            'KZT': '₸',
-            'USD': '$',
-            'EUR': '€',
-            'RUB': '₽'
-          }[settings.steam.currency] || '';
-          
           if (data.price != null) {
-            result.price = `${data.price} ${currencySymbol}`.trim();
+            result.price = formatPrice(data.price, settings.steam.currency, settings.locale);
           }
-          
+
           if (data.discount > 0 && data.originalPrice != null) {
             result.discount = `-${data.discount}%`;
-            result.originalPrice = `${data.originalPrice} ${currencySymbol}`.trim();
+            result.originalPrice = formatPrice(data.originalPrice, settings.steam.currency, settings.locale);
           }
           
           return result;
@@ -136,7 +129,7 @@ export async function fetchSteamPrice(
           const appData = data[appId].data;
           
           if (appData.is_free) {
-            return { price: 'Бесплатно' };
+            return { price: t(settings.locale, 'price.free') };
           }
           
           const priceOverview = appData.price_overview;
@@ -252,7 +245,7 @@ export async function getMappingSuggestions(gameName: string): Promise<{ existin
       const existingSearchResult = data.search?.find((s: any) => s.appId === data.existing.app_id);
       suggestions.push({
         appId: data.existing.app_id,
-        name: existingSearchResult?.name || "Existing Mapping",
+        name: existingSearchResult?.name || data.existing.game_name || "Existing Mapping",
         icon: existingSearchResult?.icon,
         isExisting: true
       });

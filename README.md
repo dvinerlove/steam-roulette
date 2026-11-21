@@ -1,4 +1,4 @@
-# 🎡 Колесо Фортуны
+# 🎡 Fortune Wheel
 
 [![Demo](https://img.shields.io/badge/demo-live-6366f1)](https://dvinerlove.github.io/fortune-wheel/)
 [![Landing](https://img.shields.io/badge/landing-promo-f472b6)](https://dvinerlove.github.io/fortune-wheel/landing.html)
@@ -7,46 +7,56 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)](https://vite.dev)
 
-Веб-приложение для случайного выбора игры из списка: крутите колесо — оно решит, во что играть. Цены и скидки подтягиваются из Steam, внешний вид полностью настраивается, а всё состояние шарится одной короткой ссылкой.
+A web app that picks a random game from your list — spin the wheel and let it decide what to play. Steam prices and discounts are fetched automatically, the look is fully customizable, and the whole state fits into one short shareable link. Available in **English** and **Russian** (auto-detected from your browser).
 
-**[▶ Открыть приложение](https://dvinerlove.github.io/fortune-wheel/)** · **[Промо-страница](https://dvinerlove.github.io/fortune-wheel/landing.html)**
+**[▶ Open the app](https://dvinerlove.github.io/fortune-wheel/)** · **[Promo page](https://dvinerlove.github.io/fortune-wheel/landing.html)**
 
-![Колесо Фортуны — скриншот](docs/screenshot.png)
+![Fortune Wheel — screenshot](docs/screenshot.png)
 
-## ✨ Возможности
+## ✨ Features
 
-- **Случайный выбор** — честный RNG (`crypto.getRandomValues`), плавная прокрутка с затуханием
-- **Steam-интеграция** — автопоиск игры в Steam, живые цены и скидки в выбранном регионе, обложки на секторах колеса
-- **Шаринг по ссылке** — короткая ссылка сохраняет список игр и все настройки (Supabase Edge Function + fallback на URL-state и localStorage)
-- **Кастомизация** — свой фон и фон колеса (загрузка изображений), цвета рамки/указателя/текста, текст кнопки, позиция и длина названий, idle-вращение
-- **Список игр** — добавление с автопривязкой к Steam, импорт списком, редактирование, подсказки маппинга
-- **История** — все выпавшие игры с ценой и временем
-- **Звук** — синтезированные звуки прокрутки и выигрыша (Web Audio API, без файлов)
-- **PWA-friendly** — работает без регистрации, данные хранятся локально
+- **Random pick** — fair RNG (`crypto.getRandomValues`) with a smooth decelerating spin
+- **Steam integration** — auto-matches games in Steam, live prices and discounts for your region, game covers on wheel sectors
+- **Link sharing** — a short link preserves your game list and all settings (Supabase Edge Function + URL-state and localStorage fallbacks)
+- **Customization** — custom app/wheel backgrounds (image upload), border/pointer/text colors, button text, label position and length, idle spin
+- **Game list** — add games with Steam auto-linking, bulk import, editing, mapping suggestions
+- **History** — every winning game with price and timestamp
+- **Sound** — synthesized spin and win sounds (Web Audio API, no files)
+- **i18n** — English/Russian UI, auto-detected; Steam region & currency defaults follow the locale
+- **PWA-friendly** — no sign-up, all data stays in your browser
 
-## 🚀 Запуск
+## 🚀 Getting started
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173/fortune-wheel/
 ```
 
-Для Steam-цен и коротких ссылок нужен `VITE_API_URL` — см. [.env.example](.env.example) (Supabase Edge Function в `supabase/functions/fortune-wheel`).
+Steam prices and short links need `VITE_API_URL` — see [.env.example](.env.example) (Supabase Edge Function in `supabase/functions/fortune-wheel`).
 
-## 📜 Скрипты
+## 📜 Scripts
 
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `npm run dev` | dev-сервер |
-| `npm run build` | typecheck + прод-сборка в `dist/` |
+| `npm run dev` | dev server |
+| `npm run build` | typecheck + production build to `dist/` |
 | `npm run lint` | oxlint |
-| `npm run preview` | предпросмотр сборки |
-| `npm run deploy` | сборка + деплой на GitHub Pages |
+| `npm run preview` | preview the build |
+| `npm run deploy` | build + deploy to GitHub Pages |
 
-## 🛠 Стек
+## 🛠 Stack
 
-React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Framer Motion · Lucide · Supabase Edge Functions · GitHub Pages (CI в `.github/workflows/deploy.yml`)
+React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Framer Motion · Lucide · Supabase Edge Functions · GitHub Pages (CI in `.github/workflows/deploy.yml`)
 
-## 📄 Лицензия
+---
+
+<details>
+<summary>🇷🇺 По-русски</summary>
+
+Веб-приложение для случайного выбора игры из списка: крутите колесо — оно решит, во что играть. Цены и скидки подтягиваются из Steam, внешний вид полностью настраивается, а всё состояние шарится одной короткой ссылкой. Интерфейс на русском и английском (определяется по языку браузера, переключается в настройках).
+
+</details>
+
+## 📄 License
 
 [MIT](LICENSE)

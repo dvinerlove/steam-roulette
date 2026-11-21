@@ -2,18 +2,20 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { HistoryItem } from '../types';
 import { X, Coins } from 'lucide-react';
+import { t, type Locale } from '../i18n';
 
 interface HistoryPanelProps {
   history: HistoryItem[];
   isOpen: boolean;
   onClose: () => void;
   onClearHistory: () => void;
+  locale: Locale;
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, onClearHistory }) => {
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, onClearHistory, locale }) => {
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return date.toLocaleTimeString(locale === 'ru' ? 'ru-RU' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   return (
@@ -28,13 +30,13 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
           onClick={onClose}
         >
           <div
-            role="dialog" aria-modal="true" aria-label="История прокрутов"
+            role="dialog" aria-modal="true" aria-label={t(locale, 'aria.history')}
             className="absolute right-0 top-0 h-full w-full md:w-[500px] bg-slate-800 border-l border-slate-700 shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 sticky top-0 bg-slate-800 border-b border-slate-700 z-10 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                История
+                {t(locale, 'history.title')}
               </h2>
               <button onClick={onClose} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700">
                 <X size={24} />
@@ -44,12 +46,12 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
             <div className="p-6">
               {history.length > 0 && (
                 <button onClick={onClearHistory} className="w-full bg-red-600/50 hover:bg-red-600 text-slate-100 py-2 px-4 rounded-lg transition-colors mb-4">
-                  Очистить историю
+                  {t(locale, 'history.clear')}
                 </button>
               )}
               {history.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
-                  История прокрутов пуста
+                  {t(locale, 'history.empty')}
                 </div>
               ) : (
                 <div className="space-y-3">
