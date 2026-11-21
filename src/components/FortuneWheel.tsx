@@ -137,7 +137,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
   })();
 
   return (
-    <div className="mx-auto w-fit p-8 -m-8 overflow-clip">
+    <div className="mx-auto w-fit overflow-clip [overflow-clip-margin:32px]">
     <div className="relative w-[min(90vw,70vh,700px)] h-[min(90vw,70vh,700px)] mx-auto">
       <div 
         className="absolute right-0 top-1/2 translate-x-4 -translate-y-1/2 z-10 w-14 h-10 md:w-16 md:h-12 shadow-xl border-2"

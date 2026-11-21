@@ -21,6 +21,7 @@ export interface Settings {
   locale: Locale;
   customization: {
     backgroundImage?: string;
+    backgroundColor?: string;
     wheelImage?: string;
     wheelImageOpacity: number;
     wheelBgColor: string;
@@ -48,6 +49,7 @@ export interface Settings {
     textStrokeColor: string;
     textStrokeWidth: number;
     textTruncationMultiplier: number;
+    confetti: boolean;
   };
   prices: {
     showPrices: boolean;
@@ -99,7 +101,8 @@ export const DEFAULT_SETTINGS: Settings = {
     textColor: '#ffffff',
     textStrokeColor: '#000000',
     textStrokeWidth: 0.1,
-    textTruncationMultiplier: 2.0
+    textTruncationMultiplier: 2.0,
+    confetti: true
   },
   prices: {
     showPrices: true,

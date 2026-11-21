@@ -43,7 +43,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                 step="0.05"
                 value={settings.sound.volume}
                 onChange={(e) => setSettings({ ...settings, sound: { ...settings.sound, volume: Number(e.target.value) } })}
-                className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
               />
             </div>
           )}
@@ -81,6 +81,13 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                 {t(loc, 'appearance.upload')}
               </label>
               {settings.customization.backgroundImage && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, backgroundImage: undefined } })} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30">{t(loc, 'action.reset')}</button>}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-slate-400 text-xs">{t(loc, 'appearance.appBgColor')}</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={settings.customization.backgroundColor || '#0f172a'} onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, backgroundColor: e.target.value } })} className="w-14 h-8 rounded" />
+                {settings.customization.backgroundColor && <button onClick={() => setSettings({ ...settings, customization: { ...settings.customization, backgroundColor: undefined } })} className="px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 text-xs">{t(loc, 'action.reset')}</button>}
+              </div>
             </div>
           </div>
         </div>
@@ -136,7 +143,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                   step="0.05"
                   value={settings.customization.wheelBgOpacity}
                   onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, wheelBgOpacity: Number(e.target.value) } })}
-                  className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
                 />
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.wheelBgOpacity * 100)}%</div>
               </div>
@@ -149,7 +156,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                   step="0.05"
                   value={settings.customization.wheelImageOpacity}
                   onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, wheelImageOpacity: Number(e.target.value) } })}
-                  className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
                 />
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.wheelImageOpacity * 100)}%</div>
               </div>
@@ -162,7 +169,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                   step="0.05"
                   value={settings.customization.colorOpacity}
                   onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, colorOpacity: Number(e.target.value) } })}
-                  className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
                 />
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.colorOpacity * 100)}%</div>
               </div>
@@ -175,7 +182,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
                   step="0.05"
                   value={settings.customization.sectorLineOpacity}
                   onChange={(e) => setSettings({ ...settings, customization: { ...settings.customization, sectorLineOpacity: Number(e.target.value) } })}
-                  className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
                 />
                 <div className="text-slate-400 text-xs text-center">{Math.round(settings.customization.sectorLineOpacity * 100)}%</div>
               </div>
@@ -246,7 +253,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
               step="0.5"
               value={settings.wheel.textTruncationMultiplier}
               onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textTruncationMultiplier: Number(e.target.value) } })}
-              className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
             />
             <div className="flex justify-between text-slate-500 text-xs">
               <span>{t(loc, 'appearance.shorter')}</span>
@@ -304,9 +311,13 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
               <span className="text-slate-300 text-sm">{t(loc, 'appearance.sectorLines')}</span>
               <input type="checkbox" checked={settings.wheel.showSectorLines} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, showSectorLines: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
-            <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg col-span-2">
+            <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
               <span className="text-slate-300 text-sm">{t(loc, 'appearance.idleSpin')}</span>
               <input type="checkbox" checked={settings.wheel.idleSpin} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, idleSpin: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
+            </label>
+            <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+              <span className="text-slate-300 text-sm">{t(loc, 'appearance.confetti')}</span>
+              <input type="checkbox" checked={settings.wheel.confetti} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, confetti: e.target.checked } })} className="w-5 h-5 accent-indigo-500" />
             </label>
           </div>
         </div>
