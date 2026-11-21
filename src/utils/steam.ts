@@ -86,7 +86,7 @@ export async function fetchSteamPrice(
     }
     
     // Fallback to proxy method if backend is not available
-    const steamUrl = `https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${settings.steam.region}&filters=price_overview`;
+    const steamUrl = `https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${settings.steam.region}&filters=basic,price_overview`;
     
     // Попробуем несколько прокси по очереди
     const proxies = [
