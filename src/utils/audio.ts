@@ -52,5 +52,25 @@ export const useAudio = () => {
     });
   };
 
-  return { playSpinSound, playWinSound };
+  // Мягкий короткий тик при пересечении границ секторов
+  const playTick = (volume: number = 0.5) => {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(1500, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(750, ctx.currentTime + 0.045);
+
+    gainNode.gain.setValueAtTime(volume * 0.12, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.05);
+  };
+
+  return { playSpinSound, playWinSound, playTick };
 };

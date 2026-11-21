@@ -377,7 +377,7 @@ function App() {
     }
   };
 
-  const { playSpinSound, playWinSound } = useAudio();
+  const { playSpinSound, playWinSound, playTick } = useAudio();
 
   // Fetch mapping suggestions for all games when games list changes
   useEffect(() => {
@@ -827,6 +827,7 @@ function App() {
               settings={settings}
               onSpinStart={handleSpinStart}
               isWinPopupOpen={selectedGame !== null}
+              onTick={(f) => settings.sound.enabled && playTick(settings.sound.volume * f)}
             />
           </div>
 
