@@ -8,6 +8,10 @@ export const useAudio = () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
+    // После idle/таба контекст может быть suspended — будим
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
     return audioContextRef.current;
   };
 

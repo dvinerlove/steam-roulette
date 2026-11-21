@@ -31,6 +31,8 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
   const spinInfoRef = useRef<{ start: number; degrees: number } | null>(null);
   const lastBoundaryRef = useRef(0);
 
+  const sectorAngle = games.length > 0 ? 360 / games.length : 360;
+
   useEffect(() => {
     currentRotationRef.current = totalRotation;
     rotate.set(totalRotation);
@@ -54,9 +56,9 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       lastTimeRef.current = performance.now();
       
       const animateIdle = (time: number) => {
-        const deltaTime = time - lastTimeRef.current;
+        const deltaTime = Math.min(time - lastTimeRef.current, 100);
         lastTimeRef.current = time;
-        
+
         const degreesToAdd = (deltaTime / 1000) * 6;
         
         currentRotationRef.current -= degreesToAdd;
@@ -92,7 +94,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
     // Use cryptographically secure random
     const randomArray = new Uint32Array(1);
     crypto.getRandomValues(randomArray);
-    const random = randomArray[0] / 0xFFFFFFFF; // Convert to 0-1
+    const random = randomArray[0] / 0x100000000; // Convert to [0, 1)
     
     const spinDegrees = 1800 + random * 360;
     const newRotation = currentRotationRef.current - spinDegrees;
@@ -112,15 +114,12 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
     // Pointer is on RIGHT (0 degrees), adjust calculation accordingly!
     const normalizedRotation = (-newRotation) % 360;
     const adjustedRotation = (normalizedRotation + 90) % 360; // because we have -90 offset in sector angles
-    const sectorAngle = 360 / games.length;
     let winningIndex = Math.floor(adjustedRotation / sectorAngle);
     if (winningIndex < 0) winningIndex += games.length;
     if (winningIndex >= games.length) winningIndex = 0;
     onResult(games[winningIndex]);
   };
 
-  const sectorAngle = 360 / games.length;
-  
   const getTextRadius = () => {
     switch (settings.wheel.textPosition) {
       case 'inner': return 22;
