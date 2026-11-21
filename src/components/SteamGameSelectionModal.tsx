@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { SteamSearchResult } from '../utils/steam';
 import { X } from 'lucide-react';
 import { t, type Locale } from '../i18n';
@@ -20,11 +21,22 @@ const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
   onSelect,
   locale,
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={t(locale, 'steamSelect.title', { name: gameName })} className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
+    <AnimatePresence>
+      {isOpen && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div
+        role="dialog" aria-modal="true" aria-label={t(locale, 'steamSelect.title', { name: gameName })}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+        transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+        className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
           <X size={20} />
         </button>
@@ -52,8 +64,10 @@ const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
         >
           {t(locale, 'steamSelect.skip')}
         </button>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
