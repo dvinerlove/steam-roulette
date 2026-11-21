@@ -290,6 +290,7 @@ const translations: Record<Locale, typeof en> = { en, ru };
 export type TranslationKey = keyof typeof en;
 
 export const formatPrice = (amount: number, currency: string, locale: string = 'en'): string => {
+  if (amount === 0) return t(locale, 'price.free');
   try {
     return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       style: 'currency',

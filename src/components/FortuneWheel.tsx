@@ -217,6 +217,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                         preserveAspectRatio="xMidYMid slice"
                         className="select-none pointer-events-none"
                         style={{ borderRadius: '50%' }}
+                        onError={(e) => { (e.target as SVGImageElement).style.display = 'none'; }}
                       />
                     ) : (
                       <circle
@@ -278,7 +279,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
       <button
         onClick={spin}
-        disabled={isSpinning}
+        disabled={isSpinning || games.length === 0}
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[15%] h-[15%] min-w-[60px] min-h-[60px] max-w-[120px] max-h-[120px] rounded-full border-6 md:border-8 shadow-xl flex items-center justify-center font-bold hover:opacity-90 transition-all z-20 disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-lg"
         style={{ 
           borderColor: settings.customization.wheelBorderColor,
