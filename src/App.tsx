@@ -142,7 +142,12 @@ function App() {
       url.searchParams.delete('share');
     }
 
-    await navigator.clipboard.writeText(url.toString());
+    try {
+      await navigator.clipboard.writeText(url.toString());
+    } catch {
+      setLinkError(t(settings.locale, 'err.shareFailed'));
+      return;
+    }
     if (shortLinkSuccess) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
@@ -162,7 +167,7 @@ function App() {
 
     // Preload prices
     const priceResults = await preloadPrices(appIds, settings.steam.region, true); // force true
-    const newGames = [...games];
+    const newGames = games.map(g => ({ ...g }));
     let processed = 0;
 
     for (const game of newGames) {
@@ -576,9 +581,13 @@ function App() {
   // Сохранение в localStorage при изменении
   useEffect(() => {
     if (!initialized) return;
-    localStorage.setItem('fortuneWheelSettings', JSON.stringify(settings));
-    localStorage.setItem('fortuneWheelGames', JSON.stringify(games));
-    localStorage.setItem('fortuneWheelHistory', JSON.stringify(history));
+    try {
+      localStorage.setItem('fortuneWheelSettings', JSON.stringify(settings));
+      localStorage.setItem('fortuneWheelGames', JSON.stringify(games));
+      localStorage.setItem('fortuneWheelHistory', JSON.stringify(history));
+    } catch {
+      // Quota exceeded (big images) — не роняем приложение
+    }
   }, [settings, games, history, initialized]);
 
   // Заголовок вкладки следует за настраиваемым заголовком
@@ -733,13 +742,13 @@ function App() {
       playWinSound(settings.sound.volume);
     }
     
-    // Добавляем в историю
+    // Добавляем в историю (храним последние 100 — localStorage не бесконечный)
     const historyItem: HistoryItem = {
       id: uid(),
       timestamp: Date.now(),
       game
     };
-    setHistory(h => [...h, historyItem]);
+    setHistory(h => [...h, historyItem].slice(-100));
     
     let gameWithAppId = { ...game };
 
