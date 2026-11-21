@@ -6,6 +6,8 @@ export const detectLocale = (): Locale =>
 const en = {
   // Game list sidebar
   'games.title': 'Games',
+  'games.collapseList': 'Collapse list',
+  'games.expandList': 'Expand list',
   'games.empty': 'List is empty — add a game above or import a list',
   'games.addPlaceholder': 'Add a game...',
   'games.findGame': 'Find on Steam',
@@ -16,7 +18,7 @@ const en = {
   'games.badgePopular': 'Popular',
   'games.name': 'Name',
   'games.color': 'Color',
-  'action.import': 'Import games',
+  'action.import': 'Import',
   'action.clearList': 'Clear game list',
   'action.share': 'Short link',
   'action.shareCopied': 'Copied!',
@@ -75,6 +77,8 @@ const en = {
   'appearance.general': 'General',
   'appearance.language': 'Language',
   'appearance.appBg': 'App background (max 1MB)',
+  'appearance.appBgColor': 'Background color',
+  'appearance.confetti': 'Confetti on win',
   'appearance.upload': 'Upload image',
   'appearance.wheelSection': 'Wheel',
   'appearance.wheelBg': 'Wheel background (max 1MB)',
@@ -153,6 +157,8 @@ const en = {
 
 const ru: typeof en = {
   'games.title': 'Список игр',
+  'games.collapseList': 'Свернуть список',
+  'games.expandList': 'Развернуть список',
   'games.empty': 'Список пуст — добавьте игру выше или импортируйте список',
   'games.addPlaceholder': 'Добавить игру...',
   'games.findGame': 'Подобрать игру',
@@ -216,6 +222,8 @@ const ru: typeof en = {
   'appearance.general': 'Общий вид',
   'appearance.language': 'Язык',
   'appearance.appBg': 'Фон приложения (макс 1MB)',
+  'appearance.appBgColor': 'Цвет фона',
+  'appearance.confetti': 'Конфетти при победе',
   'appearance.upload': 'Загрузить изображение',
   'appearance.wheelSection': 'Колесо',
   'appearance.wheelBg': 'Фон колеса (макс 1MB)',

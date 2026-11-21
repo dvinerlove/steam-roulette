@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Game, Settings, HistoryItem } from './types';
 import { INITIAL_GAMES, STEAM_APP_IDS, getGameColor } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
@@ -11,7 +11,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2 } from 'lucide-react';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
@@ -25,6 +25,7 @@ function App() {
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [listCollapsed, setListCollapsed] = useState(() => localStorage.getItem('fortuneWheelListCollapsed') === '1');
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [confirmClearGamesOpen, setConfirmClearGamesOpen] = useState(false);
@@ -53,6 +54,19 @@ function App() {
   localeRef.current = settings.locale;
   const shareFailedRef = useRef(false);
   const [tempGameId, setTempGameId] = useState<string | null>(null);
+  const confettiBits = useMemo(() => {
+    if (!selectedGame || !settings.wheel.confetti) return [];
+    const palette = games.map(g => g.color);
+    return Array.from({ length: 36 }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.5,
+      duration: 2.2 + Math.random() * 1.3,
+      color: palette[i % palette.length] || '#6366f1',
+      rot: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
+      w: 6 + Math.random() * 6,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGame, settings.wheel.confetti]);
   
   // Helper to normalize a game object to ensure all required fields are present
   const normalizeGame = (game: any, index: number = 0): Game => ({
@@ -783,9 +797,12 @@ function App() {
     <main
       className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto"
       style={{
-        backgroundImage: settings.customization.backgroundImage 
-          ? `url(${settings.customization.backgroundImage})` 
-          : 'linear-gradient(135deg, #0f172a, #1e293b)',
+        backgroundImage: settings.customization.backgroundImage
+          ? `url(${settings.customization.backgroundImage})`
+          : settings.customization.backgroundColor
+            ? 'none'
+            : 'linear-gradient(135deg, #0f172a, #1e293b)',
+        backgroundColor: settings.customization.backgroundColor || undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
@@ -825,6 +842,19 @@ function App() {
               >
                 {/* Backdrop */}
                 <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedGame(null)} />
+                {confettiBits.length > 0 && (
+                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {confettiBits.map((b, i) => (
+                      <motion.span
+                        key={i}
+                        initial={{ y: -20, rotate: 0, opacity: 1 }}
+                        animate={{ y: window.innerHeight + 60, rotate: b.rot, opacity: [1, 1, 0] }}
+                        transition={{ duration: b.duration, delay: b.delay, ease: 'easeIn' }}
+                        style={{ position: 'absolute', left: `${b.left}%`, width: b.w, height: b.w * 1.6, backgroundColor: b.color, borderRadius: 1 }}
+                      />
+                    ))}
+                  </div>
+                )}
                 <motion.div
                   role="dialog" aria-modal="true" aria-label={t(settings.locale, 'aria.win')}
                   initial={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -865,15 +895,19 @@ function App() {
                           </div>
                         ) : selectedGame.price ? (
                           <>
-                            <div className="flex items-center justify-center gap-2 text-indigo-200 mb-1">
-                              <Coins size={20} />
-                              <span className="text-sm font-semibold uppercase tracking-wider">{t(settings.locale, 'win.price')}</span>
-                            </div>
+                            {settings.prices.showPrices && (
+                              <div className="flex items-center justify-center gap-2 text-indigo-200 mb-1">
+                                <Coins size={20} />
+                                <span className="text-sm font-semibold uppercase tracking-wider">{t(settings.locale, 'win.price')}</span>
+                              </div>
+                            )}
                             <div className="flex items-center justify-center gap-4 flex-wrap">
                               {selectedGame.originalPrice && settings.prices.showDiscounts && (
                                 <span className="text-lg text-slate-400 line-through">{selectedGame.originalPrice}</span>
                               )}
-                              <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{selectedGame.price}</span>
+                              {settings.prices.showPrices && (
+                                <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{selectedGame.price}</span>
+                              )}
                               {selectedGame.discount && settings.prices.showDiscounts && (
                                 <span className="text-lg font-bold text-yellow-300 bg-yellow-500/30 px-3 py-1 rounded">{selectedGame.discount}</span>
                               )}
@@ -899,11 +933,6 @@ function App() {
                     )}
                   </div>
 
-                  {/* Декоративный фон */}
-                  <div className="absolute inset-0 -z-10 overflow-hidden rounded-2xl">
-                    <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl" />
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl" />
-                  </div>
                 </motion.div>
               </motion.div>
             )}
@@ -911,13 +940,29 @@ function App() {
         </div>
 
         <div className="lg:col-span-1 space-y-6 bg-slate-800/70 backdrop-blur-md p-6 rounded-2xl border border-slate-700 h-fit order-2 lg:order-1">
+          <button
+            onClick={() => setListCollapsed(c => { localStorage.setItem('fortuneWheelListCollapsed', c ? '0' : '1'); return !c; })}
+            aria-expanded={!listCollapsed}
+            title={t(settings.locale, listCollapsed ? 'games.expandList' : 'games.collapseList')}
+            className="w-full flex items-center justify-between text-xl font-bold py-1"
+          >
+            <span className="flex items-center gap-2">
+              <Gamepad2 className="text-indigo-400" />
+              {t(settings.locale, 'games.title')} ({games.length})
+            </span>
+            {listCollapsed ? <ChevronDown size={20} className="text-slate-400" /> : <ChevronUp size={20} className="text-slate-400" />}
+          </button>
+          <AnimatePresence initial={false}>
+          {!listCollapsed && (
+          <motion.div
+            key="gameList"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
           <div className="flex flex-col gap-3 mb-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Gamepad2 className="text-indigo-400" />
-                {t(settings.locale, 'games.title')} ({games.length})
-              </h2>
-            </div>
             <div>
               <button
                 onClick={handleCopyLink}
@@ -1030,7 +1075,7 @@ function App() {
                       <div className="flex items-center gap-3 overflow-hidden">
                         <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: game.color }} />
                         <div className="overflow-hidden">
-                          <span className="truncate text-sm font-medium block">{game.name}</span>
+                          <span className="truncate text-sm font-medium block" title={game.name}>{game.name}</span>
                           {settings.prices.showPrices && game.price && (
                             <span className="text-xs text-green-400 block">{game.price}</span>
                           )}
@@ -1040,7 +1085,7 @@ function App() {
                         {mappingSuggestions[game.id] && mappingSuggestions[game.id].length > 0 && (
                           <button
                             onClick={() => setShowMappingSuggestionsFor(showMappingSuggestionsFor === game.id ? null : game.id)}
-                            className="text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-2 py-1 bg-indigo-900/30 rounded transition-all"
+                            className="text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-2 py-1 min-w-[40px] min-h-[40px] bg-indigo-900/30 rounded transition-all flex items-center justify-center"
                             title={t(settings.locale, 'games.findGame')}
                           >
                             <Search size={16} />
@@ -1048,13 +1093,13 @@ function App() {
                         )}
                         <button
                           onClick={() => handleEditGame(game)}
-                          className="text-slate-400 hover:text-indigo-400 p-2 rounded-lg hover:bg-slate-700 transition-all"
+                          className="text-slate-400 hover:text-indigo-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <Edit2 size={18} />
                         </button>
                         <button
                           onClick={() => handleRemoveGame(game.id)}
-                          className="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-700 transition-all"
+                          className="text-slate-400 hover:text-red-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <X size={18} />
                         </button>
@@ -1155,6 +1200,9 @@ function App() {
             ))}
             </AnimatePresence>
           </div>
+          </motion.div>
+          )}
+          </AnimatePresence>
         </div>
       </div>
 
