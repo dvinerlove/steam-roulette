@@ -38,15 +38,22 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
     rotate.set(totalRotation);
   }, [totalRotation, rotate]);
 
+  const lastTickTimeRef = useRef(0);
+
   useMotionValueEvent(rotate, 'change', (v) => {
     const info = spinInfoRef.current;
     if (!info || !onTick) return;
     const traveled = info.start - v;
     const boundary = Math.floor(traveled / sectorAngle);
-    if (boundary > lastBoundaryRef.current) {
+    const now = performance.now();
+    if (boundary > lastBoundaryRef.current && now - lastTickTimeRef.current > 40) {
       lastBoundaryRef.current = boundary;
+      lastTickTimeRef.current = now;
       const progress = Math.min(Math.max(traveled / info.degrees, 0), 1);
-      onTick(Math.max(0.12, 1 - progress * 0.85));
+      // fade-in за первые ~8% спина, потом плавный спад к концу
+      const fadeIn = Math.min(1, progress / 0.08);
+      const fadeOut = Math.max(0.1, 1 - Math.pow(progress, 1.4) * 0.9);
+      onTick(fadeIn * fadeOut);
     }
   });
 
@@ -101,10 +108,12 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
     spinInfoRef.current = { start: currentRotationRef.current, degrees: spinDegrees };
     lastBoundaryRef.current = 0;
+    lastTickTimeRef.current = 0;
 
+    // easeOutExpo — длинный затухающий хвост, как у реального колеса
     await animate(rotate, newRotation, {
       duration: settings.wheel.spinDuration,
-      ease: [0.22, 1, 0.36, 1]
+      ease: [0.16, 1, 0.3, 1]
     });
     spinInfoRef.current = null;
 
