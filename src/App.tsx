@@ -819,7 +819,7 @@ function App() {
     >
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
         
-        <div className="lg:col-span-2 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
+        <div className={`${listCollapsed ? 'lg:col-span-3' : 'lg:col-span-2'} flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2`}>
           <div className="text-center space-y-4">
             <h1 className="text-2xl md:text-5xl lg:text-7xl font-black leading-[1.15] pb-[0.12em] bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
               {settings.titles.main}
@@ -949,7 +949,11 @@ function App() {
           </AnimatePresence>
         </div>
 
-        <div className="lg:col-span-1 space-y-6 bg-slate-800/70 backdrop-blur-md p-6 rounded-2xl border border-slate-700 h-fit order-2 lg:order-1">
+        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 ${
+          listCollapsed
+            ? 'lg:col-span-1 lg:absolute lg:top-0 lg:left-0 lg:z-20 p-3 lg:w-auto'
+            : 'lg:col-span-1 p-6'
+        }`}>
           <button
             onClick={() => setListCollapsed(c => { localStorage.setItem('fortuneWheelListCollapsed', c ? '0' : '1'); return !c; })}
             aria-expanded={!listCollapsed}
