@@ -33,6 +33,10 @@ body {
   overflow: auto; /* Only root scrolls */
 }
 
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
