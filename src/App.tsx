@@ -804,7 +804,7 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
     <main
-      className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto"
+      className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto [scrollbar-gutter:stable]"
       style={{
         backgroundImage: settings.customization.backgroundImage
           ? `url(${settings.customization.backgroundImage})`
