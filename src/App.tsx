@@ -1035,7 +1035,7 @@ function App() {
 
 
 
-          <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+          <div className="mt-3 max-h-[60vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_14px)]">
             {games.length === 0 && (
               <p className="text-slate-400 text-sm text-center py-6">
                 {t(settings.locale, 'games.empty')}
