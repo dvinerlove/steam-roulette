@@ -11,7 +11,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, File, Trash2, Link2, Check, Edit2 } from 'lucide-react';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
@@ -832,7 +832,15 @@ function App() {
                   exit={{ opacity: 0, y: 12, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
                   transition={{ type: 'spring', duration: 0.5, bounce: 0.25 }}
                   className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
-                  <div className="flex justify-end mb-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <button
+                      onClick={handleCopyLink}
+                      className="text-white/60 hover:text-white transition-colors p-2 flex items-center gap-1.5 text-sm"
+                      title={t(settings.locale, 'action.shareWheel')}
+                    >
+                      {linkCopied ? <Check size={18} className="text-emerald-400" /> : <Link2 size={18} />}
+                      {linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareWheel')}
+                    </button>
                     <button onClick={() => setSelectedGame(null)} className="text-white/60 hover:text-white transition-colors p-2">
                       <X size={24} />
                     </button>
@@ -910,33 +918,36 @@ function App() {
                 {t(settings.locale, 'games.title')} ({games.length})
               </h2>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setImportOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.import')}>
-                <File size={20} />
-                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.import')}</span>
+            <div>
+              <button
+                onClick={handleCopyLink}
+                className={`w-full p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white ${linkCopied ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+              >
+                {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
+                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareWheel')}</span>
               </button>
-              <button onClick={() => setConfirmClearGamesOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-red-400 p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.clearList')}>
-                <Trash2 size={20} />
-                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.clear')}</span>
+              {linkError && (
+                <div className="mt-1 text-xs text-red-400 break-all">
+                  {linkError}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => setImportOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.import')}>
+                <ClipboardPaste size={20} />
+                <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.import')}</span>
               </button>
-              <div className="flex-1 min-w-[44px]">
-                <button onClick={handleCopyLink} className="w-full text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.share')}>
-                  {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
-                  <span className="text-sm sm:hidden whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareLink')}</span>
-                </button>
-                {linkError && (
-                  <div className="mt-1 text-xs text-red-400 break-all">
-                    {linkError}
-                  </div>
-                )}
-              </div>
-              <button onClick={() => setHistoryOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.history')}>
+              <button onClick={() => setHistoryOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.history')}>
                 <HistoryIcon size={20} />
-                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.history')}</span>
+                <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.history')}</span>
               </button>
-              <button onClick={() => setSettingsOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.settings')}>
+              <button onClick={() => setConfirmClearGamesOpen(true)} className="text-slate-400 hover:text-red-400 py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.clearList')}>
+                <Trash2 size={20} />
+                <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.clear')}</span>
+              </button>
+              <button onClick={() => setSettingsOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.settings')}>
                 <SettingsIcon size={20} />
-                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.settings')}</span>
+                <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.settings')}</span>
               </button>
             </div>
           </div>
@@ -949,9 +960,8 @@ function App() {
                 onChange={(e) => setNewGameName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddGame()}
                 placeholder={t(settings.locale, 'games.addPlaceholder')}
-                className="w-full bg-slate-700 border-none rounded-lg py-2 pl-3 pr-10 focus:ring-2 focus:ring-indigo-500 text-slate-100"
+                className="w-full bg-slate-700 border-none rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 text-slate-100"
               />
-              <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
             </div>
             <button
               onClick={handleAddGame}
