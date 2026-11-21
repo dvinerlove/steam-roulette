@@ -21,7 +21,7 @@ const WinScreenSteamGameSelectionModal: React.FC<WinScreenSteamGameSelectionModa
   if (!isOpen || !game) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
           <X size={20} />
@@ -38,7 +38,7 @@ const WinScreenSteamGameSelectionModal: React.FC<WinScreenSteamGameSelectionModa
               className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-700 transition"
               onClick={() => onSelect(result.appId, game)}
             >
-              {result.icon && <img src={`https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/${result.appId}/${result.icon}.jpg`} alt={result.name} className="w-10 h-10 rounded-md" />}
+              {result.icon && <img src={result.icon} alt={result.name} className="w-10 h-10 rounded-md" />}
               <span className="text-white font-medium">{result.name}</span>
             </div>
           ))}

@@ -7,7 +7,7 @@ interface SteamGameSelectionModalProps {
   onClose: () => void;
   gameName: string;
   searchResults: SteamSearchResult[];
-  onSelect: (appId: string) => void;
+  onSelect: (appId: string | undefined) => void;
 }
 
 const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
@@ -20,7 +20,7 @@ const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
           <X size={20} />
@@ -44,7 +44,7 @@ const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
         </div>
 
         <button
-          onClick={() => onSelect(undefined as any)} // User can choose to not select an appId
+          onClick={() => onSelect(undefined)} // User can choose to not select an appId
           className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg transition"
         >
           Не привязывать к Steam

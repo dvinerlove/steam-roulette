@@ -27,6 +27,30 @@ interface GameMapping {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Транслитерация кириллицы в латиницу (для сопоставления названий Steam)
+export const transliterateRussian = (text: string): string => {
+  const cyrillicMap: Record<string, string> = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+    'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e',
+    'ю': 'yu', 'я': 'ya', 'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D',
+    'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K',
+    'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S',
+    'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
+    'Щ': 'Shch', 'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+  };
+
+  return text.split('').map(char => cyrillicMap[char] || char).join('');
+};
+
+// Нормализация строки для сравнения (регистр, пунктуация, лишние пробелы)
+export const normalizeStringForComparison = (s: string): string =>
+  s.toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 export async function fetchSteamPrice(
   appId: string, 
   settings: Pick<Settings, 'steam'>
@@ -64,7 +88,7 @@ export async function fetchSteamPrice(
           return result;
         }
       }
-    } catch (apiErr) {
+    } catch {
       // Backend API failed, falling back to proxies
     }
     
@@ -96,13 +120,13 @@ export async function fetchSteamPrice(
           try {
             const proxyData = JSON.parse(responseText);
             data = JSON.parse(proxyData.contents);
-          } catch (parseErr) {
+          } catch {
             continue;
           }
         } else {
           try {
             data = JSON.parse(responseText);
-          } catch (parseErr) {
+          } catch {
             continue;
           }
         }
@@ -129,13 +153,13 @@ export async function fetchSteamPrice(
             return result;
           }
         }
-      } catch (proxyErr) {
+      } catch {
         continue;
       }
     }
 
     return undefined;
-  } catch (error) {
+  } catch {
     return undefined;
   }
 }
@@ -145,7 +169,7 @@ export async function searchSteamGames(query: string): Promise<SteamSearchResult
     const response = await fetch(`${API_URL}/api/steam/search?q=${encodeURIComponent(query)}`);
     if (!response.ok) return [];
     return await response.json();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -155,7 +179,7 @@ export async function getGameMapping(gameName: string): Promise<GameMapping | nu
     const response = await fetch(`${API_URL}/api/mappings?gameName=${encodeURIComponent(gameName)}`);
     if (!response.ok) return null;
     return await response.json();
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -168,7 +192,7 @@ export async function saveGameMapping(gameName: string, appId: string): Promise<
       body: JSON.stringify({ gameName, appId })
     });
     return response.ok;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
