@@ -150,21 +150,21 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       <motion.div
         animate={controls}
         initial={{ rotate: 0 }}
-        className="w-full h-full rounded-full border-8 md:border-12 shadow-2xl overflow-hidden relative"
+        className="w-full h-full rounded-full border-8 md:border-12 shadow-2xl relative will-change-transform"
         style={{ 
           borderColor: settings.customization.wheelBorderColor
         }}
       >
-        <div 
-          className="absolute inset-0"
-          style={{ 
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
             backgroundColor: settings.customization.wheelBgColor,
             opacity: settings.customization.wheelBgOpacity
           }}
         />
         {settings.customization.wheelImage && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
+          <div
+            className="absolute inset-0 bg-cover bg-center rounded-full"
             style={{ 
               backgroundImage: `url(${settings.customization.wheelImage})`,
               opacity: settings.customization.wheelImageOpacity
@@ -280,7 +280,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       <button
         onClick={spin}
         disabled={isSpinning || games.length === 0}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[15%] h-[15%] min-w-[60px] min-h-[60px] max-w-[120px] max-h-[120px] rounded-full border-6 md:border-8 shadow-xl flex items-center justify-center font-bold hover:opacity-90 transition-all z-20 disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-lg"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[15%] h-[15%] min-w-[60px] min-h-[60px] max-w-[120px] max-h-[120px] rounded-full border-6 md:border-8 shadow-xl flex items-center justify-center font-bold hover:opacity-90 active:scale-95 transition-all z-20 disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-lg"
         style={{ 
           borderColor: settings.customization.wheelBorderColor,
           backgroundColor: settings.spinButton.backgroundColor,

@@ -12,7 +12,7 @@ import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
 import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, File, Trash2, Link2, Check, Edit2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
 const API_URL = import.meta.env.VITE_API_URL;
@@ -779,6 +779,7 @@ function App() {
   };
 
   return (
+    <MotionConfig reducedMotion="user">
     <main
       className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto"
       style={{
@@ -816,10 +817,10 @@ function App() {
           <AnimatePresence>
             {selectedGame && !isSpinning && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ type: 'spring', damping: 15 }}
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+                transition={{ type: 'spring', duration: 0.5, bounce: 0.25 }}
                 className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
               >
                 {/* Backdrop */}
@@ -832,7 +833,7 @@ function App() {
                   </div>
                   
                   <div className="flex flex-col items-center text-center space-y-4 relative z-10">
-                    <div className="bg-yellow-400 p-4 rounded-full shadow-lg animate-bounce">
+                    <div className="bg-yellow-400 p-4 rounded-full shadow-lg animate-bounce [animation-iteration-count:3]">
                       <Trophy className="text-slate-900" size={40} />
                     </div>
                     
@@ -962,9 +963,15 @@ function App() {
                 {t(settings.locale, 'games.empty')}
               </p>
             )}
+            <AnimatePresence initial={false}>
             {games.map((game) => (
-              <div 
+              <motion.div
                 key={game.id}
+                layout
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
                 className="flex flex-col bg-slate-700/50 p-3 rounded-lg border border-slate-600"
               >
                 {editingGame?.id === game.id ? (
@@ -1128,8 +1135,9 @@ function App() {
                     )}
                   </>
                 )}
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -1184,15 +1192,20 @@ function App() {
       {/* Импорт игр модалка */}
       <AnimatePresence>
         {importOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
             onClick={() => setImportOpen(false)}
           >
-            <div
+            <motion.div
               role="dialog" aria-modal="true" aria-label={t(settings.locale, 'import.title')}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1223,7 +1236,7 @@ function App() {
                   {t(settings.locale, 'action.cancel')}
                 </button>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1231,15 +1244,20 @@ function App() {
       {/* Подтверждение очистки игр */}
       <AnimatePresence>
         {confirmClearGamesOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
             onClick={() => setConfirmClearGamesOpen(false)}
           >
-            <div
+            <motion.div
               role="dialog" aria-modal="true" aria-label={t(settings.locale, 'clear.title')}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1267,11 +1285,12 @@ function App() {
                   {t(settings.locale, 'action.cancel')}
                 </button>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </main>
+    </MotionConfig>
   );
 }
 
