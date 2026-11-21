@@ -25,3 +25,4 @@ Thumbs.db
 # Test files
 test-endpoint.js
 test-endpoint.mjs
+supabase/.temp
