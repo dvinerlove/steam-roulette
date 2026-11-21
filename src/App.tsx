@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Game, Settings, HistoryItem } from './types';
 import { INITIAL_GAMES, STEAM_APP_IDS, getGameColor } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
 import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, type MappingSuggestion } from './utils/steam';
 import type { SteamSearchResult } from './utils/steam';
 import { useAudio } from './utils/audio';
+import { t, formatPrice } from './i18n';
 import FortuneWheel from './components/FortuneWheel';
 import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
@@ -48,6 +49,8 @@ function App() {
   const [showMappingSuggestionsFor, setShowMappingSuggestionsFor] = useState<string | null>(null);
   const [manualSearchQuery, setManualSearchQuery] = useState<string>('');
   const [manualSearchLoading, setManualSearchLoading] = useState<boolean>(false);
+  const localeRef = useRef(settings.locale);
+  localeRef.current = settings.locale;
   const [tempGameId, setTempGameId] = useState<string | null>(null);
   
   // Helper to normalize a game object to ensure all required fields are present
@@ -93,7 +96,7 @@ function App() {
     // Try to save to DB for short link
     try {
       if (!API_URL) {
-        throw new Error('API URL не настроен');
+        throw new Error(t(settings.locale, 'err.noApiUrl'));
       }
       const response = await fetch(`${API_URL}/api/shares`, {
         method: 'POST',
@@ -104,7 +107,7 @@ function App() {
       if (response.ok) {
         const { shareId } = await response.json();
         if (!shareId) {
-          throw new Error('API не вернул shareId');
+          throw new Error(t(settings.locale, 'err.noShareId'));
         }
         url.searchParams.set('share', shareId);
         url.searchParams.delete('state'); // Remove old state param if exists
@@ -112,14 +115,14 @@ function App() {
       } else {
         try {
           const errorData = await response.json();
-          throw new Error(errorData.error || `API вернул ошибку: ${response.status}`);
+          throw new Error(errorData.error || t(settings.locale, 'err.apiStatus', { code: response.status }));
         } catch {
-          throw new Error(`API вернул ошибку: ${response.status}`);
+          throw new Error(t(settings.locale, 'err.apiStatus', { code: response.status }));
         }
       }
     } catch (error) {
       // Показываем ошибку, но всё равно копируем ссылку (fallback на state-параметр)
-      setLinkError(error instanceof Error ? error.message : 'Не удалось создать короткую ссылку');
+      setLinkError(error instanceof Error ? error.message : t(settings.locale, 'err.shareFailed'));
       url.searchParams.set('state', encodedState);
       url.searchParams.delete('share');
     }
@@ -142,14 +145,6 @@ function App() {
       return;
     }
 
-    // Format currency symbol
-    const currencySymbol = {
-      'KZT': '₸',
-      'USD': '$',
-      'EUR': '€',
-      'RUB': '₽'
-    }[settings.steam.currency] || '';
-
     // Preload prices
     const priceResults = await preloadPrices(appIds, settings.steam.region, true); // force true
     const newGames = [...games];
@@ -160,11 +155,11 @@ function App() {
         const priceData = priceResults[game.appId];
         const result: any = {};
         if (priceData.price != null) {
-          result.price = `${priceData.price} ${currencySymbol}`.trim();
+          result.price = formatPrice(priceData.price, settings.steam.currency, settings.locale);
         }
         if (priceData.discount != null && priceData.discount > 0 && priceData.originalPrice != null) {
           result.discount = `-${priceData.discount}%`;
-          result.originalPrice = `${priceData.originalPrice} ${currencySymbol}`.trim();
+          result.originalPrice = formatPrice(priceData.originalPrice, settings.steam.currency, settings.locale);
         }
         game.price = result.price;
         game.discount = result.discount;
@@ -415,7 +410,7 @@ function App() {
           }
         } catch {
           setDbStatus('disconnected');
-          setDbError('Не удалось загрузить из API. Проверьте подключение.');
+          setDbError(t(loadedSettings.locale, 'err.shareLoad'));
           // Fallback to localStorage
           try {
             const shareDB = JSON.parse(localStorage.getItem('shareDB') || '{}');
@@ -530,23 +525,17 @@ function App() {
         if (appIds.length > 0) {
           setPreloading(true);
           const priceResults = await preloadPrices(appIds, loadedSettings.steam.region, false);
-          const currencySymbol = {
-            'KZT': '₸',
-            'USD': '$',
-            'EUR': '€',
-            'RUB': '₽'
-          }[loadedSettings.steam.currency] || '';
 
           const updatedGames = mappedGames.map(game => {
             if (game.appId && priceResults[game.appId]) {
               const data = priceResults[game.appId];
               const priceData: any = {};
               if (data.price != null) {
-                priceData.price = `${data.price} ${currencySymbol}`.trim();
+                priceData.price = formatPrice(data.price, loadedSettings.steam.currency, loadedSettings.locale);
               }
               if (data.discount != null && data.discount > 0 && data.originalPrice != null) {
                 priceData.discount = `-${data.discount}%`;
-                priceData.originalPrice = `${data.originalPrice} ${currencySymbol}`.trim();
+                priceData.originalPrice = formatPrice(data.originalPrice, loadedSettings.steam.currency, loadedSettings.locale);
               }
               return { ...game, ...priceData };
             }
@@ -576,8 +565,9 @@ function App() {
 
   // Заголовок вкладки следует за настраиваемым заголовком
   useEffect(() => {
-    document.title = settings.titles.main || 'Колесо Фортуны';
-  }, [settings.titles.main]);
+    document.title = settings.titles.main || 'Fortune Wheel';
+    document.documentElement.lang = settings.locale;
+  }, [settings.titles.main, settings.locale]);
 
   // Escape закрывает любой открытый оверлей
   useEffect(() => {
@@ -602,7 +592,7 @@ function App() {
     const checkConnection = async () => {
       if (!API_URL) {
         setDbStatus('disconnected');
-        setDbError('API URL не настроен. Проверьте переменную окружения VITE_API_URL.');
+        setDbError(t(localeRef.current, 'err.noApiUrl'));
         return;
       }
       try {
@@ -614,15 +604,15 @@ function App() {
             setDbError(null);
           } else {
             setDbStatus('disconnected');
-            setDbError('Ошибка подключения к базе данных.');
+            setDbError(t(localeRef.current, 'err.dbConn'));
           }
         } else {
           setDbStatus('disconnected');
-          setDbError('Ошибка подключения к API.');
+          setDbError(t(localeRef.current, 'err.apiConn'));
         }
       } catch {
         setDbStatus('disconnected');
-        setDbError('Не удалось подключиться к API.');
+        setDbError(t(localeRef.current, 'err.apiUnreachable'));
       }
     };
 
@@ -829,7 +819,7 @@ function App() {
               >
                 {/* Backdrop */}
                 <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedGame(null)} />
-                <div role="dialog" aria-modal="true" aria-label="Выпавшая игра" className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
+                <div role="dialog" aria-modal="true" aria-label={t(settings.locale, 'aria.win')} className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
                   <div className="flex justify-end mb-2">
                     <button onClick={() => setSelectedGame(null)} className="text-white/60 hover:text-white transition-colors p-2">
                       <X size={24} />
@@ -842,7 +832,7 @@ function App() {
                     </div>
                     
                     <div>
-                      <h3 className="text-white/70 uppercase tracking-widest text-xs font-bold mb-1">Выпавшая игра</h3>
+                      <h3 className="text-white/70 uppercase tracking-widest text-xs font-bold mb-1">{t(settings.locale, 'win.label')}</h3>
                       <h2 className="text-2xl sm:text-3xl font-black text-white">{selectedGame.name}</h2>
                     </div>
 
@@ -851,13 +841,13 @@ function App() {
                         {loadingPrices ? (
                           <div className="flex items-center justify-center gap-2 py-2">
                             <RefreshCcw className="animate-spin text-indigo-300" size={24} />
-                            <span className="text-lg font-medium">Загрузка...</span>
+                            <span className="text-lg font-medium">{t(settings.locale, 'win.loading')}</span>
                           </div>
                         ) : selectedGame.price ? (
                           <>
                             <div className="flex items-center justify-center gap-2 text-indigo-200 mb-1">
                               <Coins size={20} />
-                              <span className="text-sm font-semibold uppercase tracking-wider">Цена</span>
+                              <span className="text-sm font-semibold uppercase tracking-wider">{t(settings.locale, 'win.price')}</span>
                             </div>
                             <div className="flex items-center justify-center gap-4 flex-wrap">
                               {selectedGame.originalPrice && settings.prices.showDiscounts && (
@@ -871,7 +861,7 @@ function App() {
                           </>
                         ) : (
                           <div className="text-indigo-200/60 py-2 italic">
-                            {selectedGame.appId ? 'Цена не найдена' : 'Не в Steam'}
+                            {selectedGame.appId ? t(settings.locale, 'win.priceNotFound') : t(settings.locale, 'win.notOnSteam')}
                           </div>
                         )}
                       </div>
@@ -884,7 +874,7 @@ function App() {
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-white/80 hover:text-white text-sm transition-colors mt-2 underline underline-offset-4"
                       >
-                        Смотреть в Steam
+                        {t(settings.locale, 'win.viewOnSteam')}
                       </a>
                     )}
                   </div>
@@ -905,22 +895,22 @@ function App() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Coins className="text-yellow-400" />
-                Список игр ({games.length})
+                {t(settings.locale, 'games.title')} ({games.length})
               </h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setImportOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title="Импорт игр">
+              <button onClick={() => setImportOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.import')}>
                 <File size={20} />
-                <span className="text-sm sm:hidden">Импорт</span>
+                <span className="text-sm sm:hidden">{t(settings.locale, 'action.import')}</span>
               </button>
-              <button onClick={() => setConfirmClearGamesOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-red-400 p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title="Очистить список игр">
+              <button onClick={() => setConfirmClearGamesOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-red-400 p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.clearList')}>
                 <Trash2 size={20} />
-                <span className="text-sm sm:hidden">Очистить</span>
+                <span className="text-sm sm:hidden">{t(settings.locale, 'action.clear')}</span>
               </button>
               <div className="flex-1 min-w-[44px]">
-                <button onClick={handleCopyLink} className="w-full text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title="Короткая ссылка">
+                <button onClick={handleCopyLink} className="w-full text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.share')}>
                   {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
-                  <span className="text-sm sm:hidden">{linkCopied ? 'Скопировано' : 'Ссылка'}</span>
+                  <span className="text-sm sm:hidden">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareLink')}</span>
                 </button>
                 {linkError && (
                   <div className="mt-1 text-xs text-red-400 break-all">
@@ -928,13 +918,13 @@ function App() {
                   </div>
                 )}
               </div>
-              <button onClick={() => setHistoryOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title="История">
+              <button onClick={() => setHistoryOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.history')}>
                 <HistoryIcon size={20} />
-                <span className="text-sm sm:hidden">История</span>
+                <span className="text-sm sm:hidden">{t(settings.locale, 'action.history')}</span>
               </button>
-              <button onClick={() => setSettingsOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title="Настройки">
+              <button onClick={() => setSettingsOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.settings')}>
                 <SettingsIcon size={20} />
-                <span className="text-sm sm:hidden">Настройки</span>
+                <span className="text-sm sm:hidden">{t(settings.locale, 'action.settings')}</span>
               </button>
             </div>
           </div>
@@ -946,7 +936,7 @@ function App() {
                 value={newGameName}
                 onChange={(e) => setNewGameName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddGame()}
-                placeholder="Добавить игру..."
+                placeholder={t(settings.locale, 'games.addPlaceholder')}
                 className="w-full bg-slate-700 border-none rounded-lg py-2 pl-3 pr-10 focus:ring-2 focus:ring-indigo-500 text-slate-100"
               />
               <Search className="absolute right-3 top-2.5 text-slate-400" size={18} />
@@ -964,7 +954,7 @@ function App() {
           <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
             {games.length === 0 && (
               <p className="text-slate-400 text-sm text-center py-6">
-                Список пуст — добавьте игру выше или импортируйте список
+                {t(settings.locale, 'games.empty')}
               </p>
             )}
             {games.map((game) => (
@@ -975,7 +965,7 @@ function App() {
                 {editingGame?.id === game.id ? (
                   <div className="space-y-3">
                     <div className="space-y-2">
-                      <label className="text-slate-400 text-xs">Название</label>
+                      <label className="text-slate-400 text-xs">{t(settings.locale, 'games.name')}</label>
                       <input 
                         type="text" 
                         value={editForm.name} 
@@ -993,7 +983,7 @@ function App() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-slate-400 text-xs">Цвет</label>
+                      <label className="text-slate-400 text-xs">{t(settings.locale, 'games.color')}</label>
                       <input 
                         type="color" 
                         value={editForm.color} 
@@ -1002,8 +992,8 @@ function App() {
                       />
                     </div>
                     <div className="flex gap-2 pt-1">
-                      <button onClick={saveEditedGame} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded text-base font-medium">Сохранить</button>
-                      <button onClick={() => setEditingGame(null)} className="px-6 bg-slate-600 hover:bg-slate-500 text-white py-3 rounded text-base font-medium">Отмена</button>
+                      <button onClick={saveEditedGame} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded text-base font-medium">{t(settings.locale, 'action.save')}</button>
+                      <button onClick={() => setEditingGame(null)} className="px-6 bg-slate-600 hover:bg-slate-500 text-white py-3 rounded text-base font-medium">{t(settings.locale, 'action.cancel')}</button>
                     </div>
                   </div>
                 ) : (
@@ -1023,7 +1013,7 @@ function App() {
                           <button
                             onClick={() => setShowMappingSuggestionsFor(showMappingSuggestionsFor === game.id ? null : game.id)}
                             className="text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-2 py-1 bg-indigo-900/30 rounded transition-all"
-                            title="Подобрать игру"
+                            title={t(settings.locale, 'games.findGame')}
                           >
                             <Search size={16} />
                           </button>
@@ -1044,13 +1034,13 @@ function App() {
                     </div>
                     {showMappingSuggestionsFor === game.id && (
                       <div className="mt-2 space-y-2 bg-slate-800/70 p-3 rounded-lg">
-                        <h4 className="text-xs font-bold text-slate-300 mb-2">Выберите игру:</h4>
+                        <h4 className="text-xs font-bold text-slate-300 mb-2">{t(settings.locale, 'games.pickPrompt')}</h4>
                         <div className="flex gap-2 mb-2">
                           <input
                             type="text"
                             value={manualSearchQuery}
                             onChange={(e) => setManualSearchQuery(e.target.value)}
-                            placeholder="Поиск в Steam..."
+                            placeholder={t(settings.locale, 'games.searchPlaceholder')}
                             className="flex-1 text-sm px-3 py-2 rounded bg-slate-700 text-white placeholder-slate-400 border border-slate-600"
                           />
                           <button
@@ -1078,7 +1068,7 @@ function App() {
                             disabled={manualSearchLoading}
                             className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
                           >
-                            {manualSearchLoading ? '...' : 'Поиск'}
+                            {manualSearchLoading ? '...' : t(settings.locale, 'games.search')}
                           </button>
                         </div>
                         {mappingSuggestions[game.id].map((suggestion) => (
@@ -1111,10 +1101,10 @@ function App() {
                               <span className="text-sm font-medium text-white">{suggestion.name}</span>
                               <div className="flex gap-1 mt-1">
                                 {suggestion.isExisting && (
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">Текущий</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">{t(settings.locale, 'games.badgeCurrent')}</span>
                                 )}
                                 {suggestion.isMostUsed && (
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded">Популярный</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded">{t(settings.locale, 'games.badgePopular')}</span>
                                 )}
                               </div>
                             </div>
@@ -1127,7 +1117,7 @@ function App() {
                           }}
                           className="mt-2 text-sm text-slate-400 hover:text-white"
                         >
-                          Отмена
+                          {t(settings.locale, 'action.cancel')}
                         </button>
                       </div>
                     )}
@@ -1165,6 +1155,7 @@ function App() {
         onClose={() => setHistoryOpen(false)}
         history={history}
         onClearHistory={() => setHistory([])}
+        locale={settings.locale}
       />
 
       <SteamGameSelectionModal
@@ -1173,6 +1164,7 @@ function App() {
         gameName={gameNameToMap}
         searchResults={steamSearchResults}
         onSelect={handleSteamGameSelect}
+        locale={settings.locale}
       />
 
       <WinScreenSteamGameSelectionModal
@@ -1181,6 +1173,7 @@ function App() {
         game={gameToMapOnWinScreen}
         searchResults={steamSearchResults}
         onSelect={handleWinScreenGameSelect}
+        locale={settings.locale}
       />
 
       {/* Импорт игр модалка */}
@@ -1194,17 +1187,17 @@ function App() {
             onClick={() => setImportOpen(false)}
           >
             <div
-              role="dialog" aria-modal="true" aria-label="Импорт списка игр"
+              role="dialog" aria-modal="true" aria-label={t(settings.locale, 'import.title')}
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white">Импорт списка игр</h3>
+                <h3 className="text-xl font-bold text-white">{t(settings.locale, 'import.title')}</h3>
                 <button onClick={() => setImportOpen(false)} className="text-slate-400 hover:text-white">
                   <X size={24} />
                 </button>
               </div>
-              <p className="text-slate-400 mb-4">Вставьте список игр, каждая на новой строке:</p>
+              <p className="text-slate-400 mb-4">{t(settings.locale, 'import.hint')}</p>
               <textarea
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
@@ -1216,13 +1209,13 @@ function App() {
                   onClick={handleImportGames}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg transition-colors"
                 >
-                  Импортировать
+                  {t(settings.locale, 'import.submit')}
                 </button>
                 <button 
                   onClick={() => setImportOpen(false)}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
                 >
-                  Отмена
+                  {t(settings.locale, 'action.cancel')}
                 </button>
               </div>
             </div>
@@ -1241,17 +1234,17 @@ function App() {
             onClick={() => setConfirmClearGamesOpen(false)}
           >
             <div
-              role="dialog" aria-modal="true" aria-label="Очистить список игр"
+              role="dialog" aria-modal="true" aria-label={t(settings.locale, 'clear.title')}
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white">Очистить список игр?</h3>
+                <h3 className="text-xl font-bold text-white">{t(settings.locale, 'clear.title')}</h3>
                 <button onClick={() => setConfirmClearGamesOpen(false)} className="text-slate-400 hover:text-white">
                   <X size={24} />
                 </button>
               </div>
-              <p className="text-slate-400 mb-6">Вы уверены, что хотите удалить все {games.length} игр из списка? Это действие нельзя отменить.</p>
+              <p className="text-slate-400 mb-6">{t(settings.locale, 'clear.confirm', { n: games.length })}</p>
               <div className="flex gap-3">
                 <button 
                   onClick={() => {
@@ -1260,13 +1253,13 @@ function App() {
                   }}
                   className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-lg transition-colors font-semibold"
                 >
-                  Очистить
+                  {t(settings.locale, 'action.clear')}
                 </button>
                 <button 
                   onClick={() => setConfirmClearGamesOpen(false)}
                   className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-white"
                 >
-                  Отмена
+                  {t(settings.locale, 'action.cancel')}
                 </button>
               </div>
             </div>

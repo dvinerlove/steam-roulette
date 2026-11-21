@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Колесо Фортуны — случайный выбор игры</title>
-  <meta name="description" content="Колесо Фортуны — крутите колесо и пусть оно решит, во что играть. Цены и скидки из Steam, свои цвета, короткие ссылки для друзей. Бесплатно и без регистрации." />
+  <title>Fortune Wheel — pick a random game</title>
+  <meta name="description" content="Fortune Wheel — load your games, spin the wheel and let it decide what to play. Live Steam prices and discounts, shareable links. Free, no sign-up. Есть русская версия." />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -22,6 +22,8 @@
     .logo span { color: #818cf8; }
     nav a { color: #94a3b8; text-decoration: none; margin-left: 24px; font-size: 15px; }
     nav a:hover { color: #fff; }
+    nav a.lang { opacity: .55; }
+    nav a.lang.active { color: #fff; opacity: 1; text-decoration: underline; }
     .hero { text-align: center; padding: 64px 0 48px; }
     .hero h1 {
       font-size: clamp(36px, 7vw, 72px); font-weight: 900; line-height: 1.1;
@@ -62,32 +64,74 @@
 <body>
   <div class="wrap">
     <nav>
-      <div class="logo">Колесо<span>Фортуны</span></div>
+      <div class="logo" data-i="logo">Fortune<span>Wheel</span></div>
       <div>
-        <a href="./">Приложение</a>
+        <a class="lang" href="?lang=en" data-lang="en">EN</a><a class="lang" href="?lang=ru" data-lang="ru">RU</a>
+        <a href="./" data-i="navApp">Open app</a>
         <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">GitHub</a>
       </div>
     </nav>
 
     <section class="hero">
-      <h1>Пусть колесо решит,<br>во что играть</h1>
-      <p>Загрузите список игр, крутите колесо и получайте случайный выбор с живыми ценами и скидками Steam. Делитесь своим колесом с друзьями одной ссылкой.</p>
-      <a class="cta" href="./">Крутить колесо →</a>
-      <div class="shot"><img src="og-image.png" alt="Колесо Фортуны — скриншот приложения" /></div>
+      <h1 data-i="h1">Let the wheel decide<br>what to play</h1>
+      <p data-i="sub">Load your game list, spin the wheel and get a random pick with live Steam prices and discounts. Share your wheel with friends via a single link.</p>
+      <a class="cta" href="./" data-i="cta">Spin the wheel →</a>
+      <div class="shot"><img src="og-image.png" alt="Fortune Wheel — app screenshot" /></div>
     </section>
 
-    <section class="features">
-      <div class="card"><h3>🎯 Случайный выбор</h3><p>Честная криптографическая рандомизация и плавная анимация прокрутки с затуханием.</p></div>
-      <div class="card"><h3>💰 Цены Steam</h3><p>Автоматический поиск игры в Steam, актуальная цена и размер скидки — прямо на колесе и в результате.</p></div>
-      <div class="card"><h3>🔗 Шаринг ссылкой</h3><p>Короткая ссылка сохраняет ваш список игр и все настройки оформления — отправьте друзьям.</p></div>
-      <div class="card"><h3>🎨 Полная кастомизация</h3><p>Свой фон, цвета секторов, обложки игр, текст кнопки, скорость вращения и звук.</p></div>
-      <div class="card"><h3>📜 История прокрутов</h3><p>Все выпавшие игры сохраняются — ничего не потеряется между сессиями.</p></div>
-      <div class="card"><h3>🚀 Без регистрации</h3><p>Открыли — крутите. Всё работает в браузере, данные хранятся локально.</p></div>
-    </section>
+    <section class="features" id="features"></section>
 
-    <footer>
-      Сделано с ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Исходный код на GitHub</a>
+    <footer data-i="footer">
+      Made with ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Source on GitHub</a>
     </footer>
   </div>
+
+  <script>
+    const S = {
+      en: {
+        logo: 'Fortune<span>Wheel</span>',
+        navApp: 'Open app',
+        h1: 'Let the wheel decide<br>what to play',
+        sub: 'Load your game list, spin the wheel and get a random pick with live Steam prices and discounts. Share your wheel with friends via a single link.',
+        cta: 'Spin the wheel →',
+        footer: 'Made with ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Source on GitHub</a>',
+        cards: [
+          ['🎯 Random pick', 'Fair cryptographic randomness with a smooth decelerating spin animation.'],
+          ['💰 Steam prices', 'Automatic Steam lookup shows live price and discount — right on the wheel and in the result.'],
+          ['🔗 Link sharing', 'A short link saves your game list and all theme settings — send it to friends.'],
+          ['🎨 Full customization', 'Your own background, sector colors, game covers, button text, spin speed and sound.'],
+          ['📜 Spin history', 'Every winning game is saved — nothing gets lost between sessions.'],
+          ['🚀 No sign-up', 'Open and spin. Everything runs in your browser, data stays local.'],
+        ],
+        title: 'Fortune Wheel — pick a random game',
+      },
+      ru: {
+        logo: 'Колесо<span>Фортуны</span>',
+        navApp: 'Приложение',
+        h1: 'Пусть колесо решит,<br>во что играть',
+        sub: 'Загрузите список игр, крутите колесо и получайте случайный выбор с живыми ценами и скидками Steam. Делитесь своим колесом с друзьями одной ссылкой.',
+        cta: 'Крутить колесо →',
+        footer: 'Сделано с ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Исходный код на GitHub</a>',
+        cards: [
+          ['🎯 Случайный выбор', 'Честная криптографическая рандомизация и плавная анимация прокрутки с затуханием.'],
+          ['💰 Цены Steam', 'Автоматический поиск игры в Steam, актуальная цена и размер скидки — прямо на колесе и в результате.'],
+          ['🔗 Шаринг ссылкой', 'Короткая ссылка сохраняет ваш список игр и все настройки оформления — отправьте друзьям.'],
+          ['🎨 Полная кастомизация', 'Свой фон, цвета секторов, обложки игр, текст кнопки, скорость вращения и звук.'],
+          ['📜 История прокрутов', 'Все выпавшие игры сохраняются — ничего не потеряется между сессиями.'],
+          ['🚀 Без регистрации', 'Открыли — крутите. Всё работает в браузере, данные хранятся локально.'],
+        ],
+        title: 'Колесо Фортуны — случайный выбор игры',
+      },
+    };
+    const params = new URLSearchParams(location.search);
+    const lang = params.get('lang') || (navigator.language.startsWith('ru') ? 'ru' : 'en');
+    const s = S[lang] || S.en;
+    document.documentElement.lang = lang;
+    document.title = s.title;
+    document.querySelectorAll('[data-i]').forEach(el => { el.innerHTML = s[el.dataset.i]; });
+    document.getElementById('features').innerHTML = s.cards
+      .map(([h, p]) => `<div class="card"><h3>${h}</h3><p>${p}</p></div>`).join('');
+    document.querySelectorAll('a.lang').forEach(a => a.classList.toggle('active', a.dataset.lang === lang));
+  </script>
 </body>
 </html>

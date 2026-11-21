@@ -2,6 +2,7 @@ import React from 'react';
 import type { Game } from '../types';
 import type { SteamSearchResult } from '../utils/steam';
 import { X } from 'lucide-react';
+import { t, type Locale } from '../i18n';
 
 interface WinScreenSteamGameSelectionModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface WinScreenSteamGameSelectionModalProps {
   game: Game | null;
   searchResults: SteamSearchResult[];
   onSelect: (appId: string | undefined, originalGame: Game) => void;
+  locale: Locale;
 }
 
 const WinScreenSteamGameSelectionModal: React.FC<WinScreenSteamGameSelectionModalProps> = ({
@@ -17,18 +19,19 @@ const WinScreenSteamGameSelectionModal: React.FC<WinScreenSteamGameSelectionModa
   game,
   searchResults,
   onSelect,
+  locale,
 }) => {
   if (!isOpen || !game) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Уточнить игру" className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t(locale, 'winSelect.title', { name: game.name })} className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
           <X size={20} />
         </button>
-        <h2 className="text-xl font-bold text-white mb-4">Уточнить игру "{game.name}"</h2>
+        <h2 className="text-xl font-bold text-white mb-4">{t(locale, 'winSelect.title', { name: game.name })}</h2>
         <p className="text-slate-300 mb-4">
-          Найдено несколько игр Steam, соответствующих вашей. Выберите правильную, чтобы получить информацию о ценах.
+          {t(locale, 'winSelect.hint')}
         </p>
 
         <div className="space-y-3">
@@ -48,7 +51,7 @@ const WinScreenSteamGameSelectionModal: React.FC<WinScreenSteamGameSelectionModa
           onClick={() => onSelect(undefined, game)} // User can choose to not select an appId
           className="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg transition"
         >
-          Не привязывать к Steam
+          {t(locale, 'steamSelect.skip')}
         </button>
       </div>
     </div>

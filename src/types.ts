@@ -15,7 +15,10 @@ export interface HistoryItem {
   game: Game;
 }
 
+import { detectLocale, type Locale } from './i18n';
+
 export interface Settings {
+  locale: Locale;
   customization: {
     backgroundImage?: string;
     wheelImage?: string;
@@ -66,7 +69,10 @@ export interface Settings {
   };
 }
 
+const defaultLocale = detectLocale();
+
 export const DEFAULT_SETTINGS: Settings = {
+  locale: defaultLocale,
   customization: {
     wheelBorderColor: '#1f2937',
     pointerColor: '#ffffff',
@@ -77,8 +83,8 @@ export const DEFAULT_SETTINGS: Settings = {
     sectorLineOpacity: 0.5
   },
   steam: {
-    region: 'kz',
-    currency: 'KZT',
+    region: defaultLocale === 'ru' ? 'kz' : 'us',
+    currency: defaultLocale === 'ru' ? 'KZT' : 'USD',
     enableIntegration: true,
     useProxy: true
   },
@@ -110,8 +116,8 @@ export const DEFAULT_SETTINGS: Settings = {
     volume: 0.5
   },
   titles: {
-    main: 'КОЛЕСО ФОРТУНЫ',
-    subtitle: 'Крути лудик'
+    main: defaultLocale === 'ru' ? 'КОЛЕСО ФОРТУНЫ' : 'FORTUNE WHEEL',
+    subtitle: defaultLocale === 'ru' ? 'Крути лудик' : 'Spin it, pick it'
   }
 };
 
