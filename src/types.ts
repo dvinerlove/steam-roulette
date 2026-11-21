@@ -114,3 +114,16 @@ export const DEFAULT_SETTINGS: Settings = {
     subtitle: 'Крути лудик'
   }
 };
+
+// Deep-merge a partial settings object (from share links / localStorage) over defaults
+export const mergeSettings = (partial?: Partial<Settings>): Settings => ({
+  ...DEFAULT_SETTINGS,
+  ...partial,
+  customization: { ...DEFAULT_SETTINGS.customization, ...partial?.customization },
+  wheel: { ...DEFAULT_SETTINGS.wheel, ...partial?.wheel },
+  spinButton: { ...DEFAULT_SETTINGS.spinButton, ...partial?.spinButton },
+  sound: { ...DEFAULT_SETTINGS.sound, ...partial?.sound },
+  titles: { ...DEFAULT_SETTINGS.titles, ...partial?.titles },
+  steam: { ...DEFAULT_SETTINGS.steam, ...partial?.steam },
+  prices: { ...DEFAULT_SETTINGS.prices, ...partial?.prices },
+});

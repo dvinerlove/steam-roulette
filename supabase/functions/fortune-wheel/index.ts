@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
       pathname === "/api/health" ||
       pathname.includes("health")
     ) {
-      const { data, error } = await supabase.from("shares").select("id").limit(1);
+      const { error } = await supabase.from("shares").select("id").limit(1);
       
       if (error) {
         return new Response(
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
       const normalizedGameName = normalizeString(gameName);
       
       // First get exact existing mapping
-      let { data: existingMapping, error: mappingErr } = await supabase
+      let { data: existingMapping } = await supabase
         .from("game_mappings")
         .select("*")
         .eq("game_name", gameName)

@@ -1,7 +1,10 @@
 {
   "name": "fortune-wheel",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Колесо Фортуны — случайный выбор игры с ценами и скидками Steam",
+  "homepage": "https://dvinerlove.github.io/fortune-wheel/",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

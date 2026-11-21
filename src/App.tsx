@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { Game, Settings, HistoryItem } from './types';
 import { INITIAL_GAMES, STEAM_APP_IDS, getGameColor } from './constants';
-import { DEFAULT_SETTINGS } from './types';
-import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, type MappingSuggestion } from './utils/steam';
+import { DEFAULT_SETTINGS, mergeSettings } from './types';
+import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, type MappingSuggestion } from './utils/steam';
 import type { SteamSearchResult } from './utils/steam';
+import { useAudio } from './utils/audio';
 import FortuneWheel from './components/FortuneWheel';
 import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
@@ -12,60 +13,8 @@ import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSel
 import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, File, Trash2, Link2, Check, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Функция для создания звуков с помощью Web Audio API
-const useAudio = () => {
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  const getAudioContext = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    return audioContextRef.current;
-  };
-
-  const playSpinSound = (volume: number = 0.5) => {
-    const ctx = getAudioContext();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(200, ctx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.5);
-    
-    gainNode.gain.setValueAtTime(volume * 0.3, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-    
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.5);
-  };
-
-  const playWinSound = (volume: number = 0.5) => {
-    const ctx = getAudioContext();
-    const frequencies = [440, 554, 659, 880]; // A4, C#5, E5, A5
-    
-    frequencies.forEach((freq, i) => {
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1);
-      
-      gainNode.gain.setValueAtTime(volume * 0.4, ctx.currentTime + i * 0.1);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.3);
-      
-      oscillator.start(ctx.currentTime + i * 0.1);
-      oscillator.stop(ctx.currentTime + i * 0.1 + 0.3);
-    });
-  };
-
-  return { playSpinSound, playWinSound };
-};
+const uid = () => Math.random().toString(36).slice(2, 11);
+const API_URL = import.meta.env.VITE_API_URL;
 
 function App() {
   const [games, setGames] = useState<Game[]>([]);
@@ -103,7 +52,7 @@ function App() {
   
   // Helper to normalize a game object to ensure all required fields are present
   const normalizeGame = (game: any, index: number = 0): Game => ({
-    id: game.id || Math.random().toString(36).substr(2, 9),
+    id: game.id || uid(),
     name: game.name || '',
     appId: game.appId || undefined,
     price: game.price,
@@ -112,31 +61,6 @@ function App() {
     color: game.color || getGameColor(index),
     image: game.image
   });
-
-  // Helper to transliterate Russian to Latin characters
-  const transliterateRussian = (text: string): string => {
-    const cyrillicMap: Record<string, string> = {
-      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
-      'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
-      'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
-      'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e',
-      'ю': 'yu', 'я': 'ya', 'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D',
-      'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K',
-      'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S',
-      'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh',
-      'Щ': 'Shch', 'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
-    };
-    
-    return text.split('').map(char => cyrillicMap[char] || char).join('');
-  };
-
-  // Helper to normalize strings for comparison (ignore case, punctuation, extra spaces)
-  const normalizeStringForComparison = (s: string): string => {
-    return s.toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, '') // remove punctuation and symbols
-      .replace(/\s+/g, ' ') // replace multiple spaces with single
-      .trim();
-  };
 
   const clearAll = () => {
     setSettings(DEFAULT_SETTINGS);
@@ -189,12 +113,12 @@ function App() {
         try {
           const errorData = await response.json();
           throw new Error(errorData.error || `API вернул ошибку: ${response.status}`);
-        } catch (parseError) {
+        } catch {
           throw new Error(`API вернул ошибку: ${response.status}`);
         }
       }
     } catch (error) {
-      // Show error but still copy a link (fallback to state param)
+      // Показываем ошибку, но всё равно копируем ссылку (fallback на state-параметр)
       setLinkError(error instanceof Error ? error.message : 'Не удалось создать короткую ссылку');
       url.searchParams.set('state', encodedState);
       url.searchParams.delete('share');
@@ -210,8 +134,6 @@ function App() {
   const handlePreloadPrices = async () => {
     setPreloading(true);
     setPreloadProgress(0);
-    console.log('Preloading prices...');
-    
     const gamesWithAppId = games.filter(g => g.appId);
     const appIds = gamesWithAppId.map(g => g.appId as string);
     
@@ -266,15 +188,11 @@ function App() {
       const normalizedGameName = normalizeStringForComparison(game.name);
       const transliteratedGameName = normalizeStringForComparison(transliterateRussian(game.name));
       
-      let autoMapSuggestion: MappingSuggestion | undefined;
-      
       // Only auto-map if we have an exact normalized or transliterated match!
-      autoMapSuggestion = suggestions.find(s => normalizeStringForComparison(s.name) === normalizedGameName);
-      
-      if (!autoMapSuggestion) {
-        autoMapSuggestion = suggestions.find(s => normalizeStringForComparison(transliterateRussian(s.name)) === transliteratedGameName);
-      }
-      
+      const autoMapSuggestion =
+        suggestions.find(s => normalizeStringForComparison(s.name) === normalizedGameName)
+        ?? suggestions.find(s => normalizeStringForComparison(transliterateRussian(s.name)) === transliteratedGameName);
+
       if (autoMapSuggestion) {
         await handleApplyMappingSuggestion(game.id, autoMapSuggestion.appId);
       }
@@ -338,16 +256,13 @@ function App() {
   };
 
   const saveEditedGame = () => {
-    // Placeholder for saving edited game logic
-    console.log('Saving edited game:', editingGame, editForm);
     if (editingGame) {
-      setGames(games.map(g => g.id === editingGame.id ? { ...g, ...editForm } : g));
+      setGames(games.map(g => g.id === editingGame.id ? { ...g, ...editForm, appId: editForm.appId || undefined } : g));
       setEditingGame(null);
     }
   };
 
   const handleEditGame = (game: Game) => {
-    // Placeholder for handling game edit
     setEditingGame(game);
     setEditForm({ name: game.name, appId: game.appId || '', color: game.color, image: game.image || '' });
   };
@@ -375,7 +290,7 @@ function App() {
         gameImage = selectedResult?.icon || getSteamGameIconUrl(selectedAppId);
       }
       const newGame: Game = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: uid(),
         name: gameNameToMap,
         appId: selectedAppId,
         color: getGameColor(games.length), // Use current length for color calculation
@@ -454,8 +369,6 @@ function App() {
 
   const { playSpinSound, playWinSound } = useAudio();
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   // Fetch mapping suggestions for all games when games list changes
   useEffect(() => {
     if (!initialized) return;
@@ -491,38 +404,7 @@ function App() {
             const sharedState = await response.json();
             
             if (sharedState.settings) {
-              loadedSettings = { 
-                ...DEFAULT_SETTINGS, 
-                ...sharedState.settings,
-                customization: {
-                  ...DEFAULT_SETTINGS.customization,
-                  ...sharedState.settings.customization
-                },
-                wheel: {
-                  ...DEFAULT_SETTINGS.wheel,
-                  ...sharedState.settings.wheel
-                },
-                spinButton: {
-                  ...DEFAULT_SETTINGS.spinButton,
-                  ...sharedState.settings.spinButton
-                },
-                sound: {
-                  ...DEFAULT_SETTINGS.sound,
-                  ...sharedState.settings.sound
-                },
-                titles: {
-                  ...DEFAULT_SETTINGS.titles,
-                  ...sharedState.settings.titles
-                },
-                steam: {
-                  ...DEFAULT_SETTINGS.steam,
-                  ...sharedState.settings.steam
-                },
-                prices: {
-                  ...DEFAULT_SETTINGS.prices,
-                  ...sharedState.settings.prices
-                }
-              };
+              loadedSettings = mergeSettings(sharedState.settings);
             }
             if (sharedState.games) {
               loadedGames = sharedState.games.map(normalizeGame);
@@ -531,48 +413,17 @@ function App() {
           } else {
             throw new Error('API share not found');
           }
-        } catch (err) {
+        } catch {
           setDbStatus('disconnected');
           setDbError('Не удалось загрузить из API. Проверьте подключение.');
           // Fallback to localStorage
           try {
             const shareDB = JSON.parse(localStorage.getItem('shareDB') || '{}');
             const sharedState = shareDB[shareId];
-            
+
             if (sharedState) {
               if (sharedState.settings) {
-                loadedSettings = { 
-                  ...DEFAULT_SETTINGS, 
-                  ...sharedState.settings,
-                  customization: {
-                    ...DEFAULT_SETTINGS.customization,
-                    ...sharedState.settings.customization
-                  },
-                  wheel: {
-                    ...DEFAULT_SETTINGS.wheel,
-                    ...sharedState.settings.wheel
-                  },
-                  spinButton: {
-                    ...DEFAULT_SETTINGS.spinButton,
-                    ...sharedState.settings.spinButton
-                  },
-                  sound: {
-                    ...DEFAULT_SETTINGS.sound,
-                    ...sharedState.settings.sound
-                  },
-                  titles: {
-                    ...DEFAULT_SETTINGS.titles,
-                    ...sharedState.settings.titles
-                  },
-                  steam: {
-                    ...DEFAULT_SETTINGS.steam,
-                    ...sharedState.settings.steam
-                  },
-                  prices: {
-                    ...DEFAULT_SETTINGS.prices,
-                    ...sharedState.settings.prices
-                  }
-                };
+                loadedSettings = mergeSettings(sharedState.settings);
               }
               if (sharedState.games) {
                 loadedGames = sharedState.games.map(normalizeGame);
@@ -587,38 +438,7 @@ function App() {
         try {
           const decoded = JSON.parse(decodeURIComponent(atob(stateParam)));
           if (decoded.settings) {
-            loadedSettings = { 
-              ...DEFAULT_SETTINGS, 
-              ...decoded.settings,
-              customization: {
-                ...DEFAULT_SETTINGS.customization,
-                ...decoded.settings.customization
-              },
-              wheel: {
-                ...DEFAULT_SETTINGS.wheel,
-                ...decoded.settings.wheel
-              },
-              spinButton: {
-                ...DEFAULT_SETTINGS.spinButton,
-                ...decoded.settings.spinButton
-              },
-              sound: {
-                ...DEFAULT_SETTINGS.sound,
-                ...decoded.settings.sound
-              },
-              titles: {
-                ...DEFAULT_SETTINGS.titles,
-                ...decoded.settings.titles
-              },
-              steam: {
-                ...DEFAULT_SETTINGS.steam,
-                ...decoded.settings.steam
-              },
-              prices: {
-                ...DEFAULT_SETTINGS.prices,
-                ...decoded.settings.prices
-              }
-            };
+            loadedSettings = mergeSettings(decoded.settings);
           }
           if (decoded.games) {
             loadedGames = decoded.games.map(normalizeGame);
@@ -637,39 +457,7 @@ function App() {
           const savedHistory = localStorage.getItem('fortuneWheelHistory');
           
           if (savedSettings) {
-            const parsed = JSON.parse(savedSettings);
-            loadedSettings = { 
-              ...DEFAULT_SETTINGS, 
-              ...parsed,
-              customization: {
-                ...DEFAULT_SETTINGS.customization,
-                ...parsed.customization
-              },
-              wheel: {
-                ...DEFAULT_SETTINGS.wheel,
-                ...parsed.wheel
-              },
-              spinButton: {
-                ...DEFAULT_SETTINGS.spinButton,
-                ...parsed.spinButton
-              },
-              sound: {
-                ...DEFAULT_SETTINGS.sound,
-                ...parsed.sound
-              },
-              titles: {
-                ...DEFAULT_SETTINGS.titles,
-                ...parsed.titles
-              },
-              steam: {
-                ...DEFAULT_SETTINGS.steam,
-                ...parsed.steam
-              },
-              prices: {
-                ...DEFAULT_SETTINGS.prices,
-                ...parsed.prices
-              }
-            };
+            loadedSettings = mergeSettings(JSON.parse(savedSettings));
           }
           if (savedGames) {
             loadedGames = JSON.parse(savedGames).map(normalizeGame);
@@ -685,7 +473,7 @@ function App() {
       // 3. Если ничего не загружено, используем дефолтные игры
       if (loadedGames.length === 0) {
         loadedGames = INITIAL_GAMES.map((name, index) => ({
-          id: Math.random().toString(36).substr(2, 9),
+          id: uid(),
           name,
           appId: STEAM_APP_IDS[name],
           color: getGameColor(index)
@@ -778,13 +566,22 @@ function App() {
     init();
   }, [initialized]);
 
-  // Сохранение настроек в localStorage при изменении
+  // Сохранение в localStorage при изменении
   useEffect(() => {
     if (!initialized) return;
     localStorage.setItem('fortuneWheelSettings', JSON.stringify(settings));
     localStorage.setItem('fortuneWheelGames', JSON.stringify(games));
     localStorage.setItem('fortuneWheelHistory', JSON.stringify(history));
+  }, [settings, games, history, initialized]);
 
+  // Заголовок вкладки следует за настраиваемым заголовком
+  useEffect(() => {
+    document.title = settings.titles.main || 'Колесо Фортуны';
+  }, [settings.titles.main]);
+
+  // Проверка связи с API — один раз после инициализации
+  useEffect(() => {
+    if (!initialized) return;
     const checkConnection = async () => {
       if (!API_URL) {
         setDbStatus('disconnected');
@@ -806,14 +603,14 @@ function App() {
           setDbStatus('disconnected');
           setDbError('Ошибка подключения к API.');
         }
-      } catch (error) {
+      } catch {
         setDbStatus('disconnected');
         setDbError('Не удалось подключиться к API.');
       }
     };
 
     checkConnection();
-  }, [settings, games, history, initialized, API_URL]);
+  }, [initialized]);
 
   const handleAddGame = async () => {
     if (!newGameName.trim()) return;
@@ -827,7 +624,7 @@ function App() {
       if (dbMapping) {
         // We have a mapping, add the game now and fetch price in background
         const newGame: Game = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: uid(),
           name: gameName,
           appId: dbMapping.app_id,
           color: getGameColor(games.length),
@@ -843,7 +640,7 @@ function App() {
         if (searchResults.length === 1) {
           // Auto-select if only one result
           const newGame: Game = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uid(),
             name: gameName,
             appId: searchResults[0].appId,
             color: getGameColor(games.length),
@@ -857,7 +654,7 @@ function App() {
         } else if (searchResults.length > 1) {
           // Show modal for user to choose, add a temp game first
           const tempGame: Game = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uid(),
             name: gameName,
             color: getGameColor(games.length)
           };
@@ -869,7 +666,7 @@ function App() {
         } else {
           // No results, just add the game
           const newGame: Game = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uid(),
             name: gameName,
             color: getGameColor(games.length)
           };
@@ -879,7 +676,7 @@ function App() {
     } else {
       // Steam integration disabled, just add the game
       const newGame: Game = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: uid(),
         name: gameName,
         color: getGameColor(games.length)
       };
@@ -890,7 +687,7 @@ function App() {
   const handleImportGames = () => {
     const lines = importText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const newGames: Game[] = lines.map((name, index) => ({
-      id: Math.random().toString(36).substr(2, 9),
+      id: uid(),
       name,
       appId: STEAM_APP_IDS[name],
       color: getGameColor(games.length + index)
@@ -912,7 +709,7 @@ function App() {
     
     // Добавляем в историю
     const historyItem: HistoryItem = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: uid(),
       timestamp: Date.now(),
       game
     };
@@ -1148,6 +945,11 @@ function App() {
 
 
           <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+            {games.length === 0 && (
+              <p className="text-slate-400 text-sm text-center py-6">
+                Список пуст — добавьте игру выше или импортируйте список
+              </p>
+            )}
             {games.map((game) => (
               <div 
                 key={game.id}

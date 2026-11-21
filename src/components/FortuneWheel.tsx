@@ -111,20 +111,32 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
   const textRadius = getTextRadius();
 
-  const getFontSize = () => {
-    if (games.length <= 4) return 9;
-    if (games.length <= 8) return 7;
-    if (games.length <= 16) return 5;
-    if (games.length <= 24) return 4;
-    if (games.length <= 36) return 3.2;
-    if (games.length <= 50) return 2.6;
-    return 2.2;
+  const truncateName = (name: string): string => {
+    const truncMult = settings.wheel.textTruncationMultiplier;
+    if (truncMult >= 10) return name;
+    const count = games.length;
+    const baseLen =
+      count <= 4 ? 22 : count <= 8 ? 18 : count <= 16 ? 14 :
+      count <= 24 ? 10 : count <= 36 ? 8 : count <= 50 ? 6 : 5;
+    const maxLen = Math.round(baseLen * truncMult);
+    return name.length > maxLen ? `${name.substring(0, Math.max(3, maxLen - 3))}...` : name;
   };
 
-  const fontSize = getFontSize();
+  // Шрифт: базовый размер по числу секторов, ужимаем чтобы имя влезало в дугу сектора
+  const fontSize = (() => {
+    const count = games.length;
+    const base =
+      count <= 4 ? 9 : count <= 8 ? 7 : count <= 16 ? 5 :
+      count <= 24 ? 4 : count <= 36 ? 3.2 : count <= 50 ? 2.6 : 2.2;
+    if (count === 0) return base;
+    // текст идёт от края внутрь — ширина строки ограничена радиальной глубиной
+    const radial = Math.max(textRadius - 6, 12);
+    const maxLen = Math.max(1, ...games.map(g => truncateName(g.name).length));
+    return Math.min(base, radial / (0.62 * maxLen));
+  })();
 
   return (
-    <div className="relative w-[min(90vw,90vh,700px)] h-[min(90vw,90vh,700px)] mx-auto">
+    <div className="relative w-[min(90vw,70vh,700px)] h-[min(90vw,70vh,700px)] mx-auto">
       <div 
         className="absolute right-0 top-1/2 translate-x-4 -translate-y-1/2 z-10 w-14 h-10 md:w-16 md:h-12 shadow-xl border-2"
         style={{ 
@@ -173,36 +185,13 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
             const textX = 50 + textRadius * Math.cos((sectorMidAngle * Math.PI) / 180);
             const textY = 50 + textRadius * Math.sin((sectorMidAngle * Math.PI) / 180);
-            
-            const textRotation = sectorMidAngle;
-            
-            const truncMult = settings.wheel.textTruncationMultiplier;
-            let displayName = game.name;
-            // Не обрезаем текст, если множитель >= 10
-            if (truncMult < 10) {
-              if (games.length <= 4) {
-                const maxLen = Math.round(22 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else if (games.length <= 8) {
-                const maxLen = Math.round(18 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else if (games.length <= 16) {
-                const maxLen = Math.round(14 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else if (games.length <= 24) {
-                const maxLen = Math.round(10 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else if (games.length <= 36) {
-                const maxLen = Math.round(8 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else if (games.length <= 50) {
-                const maxLen = Math.round(6 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              } else {
-                const maxLen = Math.round(5 * truncMult);
-                displayName = game.name.length > maxLen ? `${game.name.substring(0, Math.max(3, maxLen - 3))}...` : game.name;
-              }
-            }
+
+            // Переворачиваем текст на левой половине колеса, чтобы он не был вверх ногами
+            const midDeg = ((sectorMidAngle % 360) + 360) % 360;
+            const flip = midDeg > 90 && midDeg < 270;
+            const textRotation = flip ? sectorMidAngle + 180 : sectorMidAngle;
+
+            const displayName = truncateName(game.name);
 
             return (
               <g key={game.id}>
@@ -246,7 +235,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                       fill={settings.wheel.textColor}
                       fontSize={fontSize}
                       fontWeight="900"
-                      textAnchor="middle"
+                      textAnchor={flip ? 'start' : 'end'}
                       dominantBaseline={settings.wheel.showImages && game.image ? "hanging" : "middle"}
                       y={settings.wheel.showImages && game.image ? "7" : "0"}
                       className="select-none pointer-events-none"
