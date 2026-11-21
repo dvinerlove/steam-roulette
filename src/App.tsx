@@ -384,17 +384,17 @@ function App() {
 
   const { playSpinSound, playWinSound, playTick } = useAudio();
 
-  // Fetch mapping suggestions for all games when games list changes
-  useEffect(() => {
-    if (!initialized) return;
-
-    // Fetch suggestions for ALL games (even mapped ones, so button appears!)
-    for (const game of games) {
-      if (!mappingSuggestions[game.id]) {
-        fetchMappingSuggestionsForGame(game);
-      }
+  // Подсказки маппинга грузим лениво по клику — не все 80 запросов разом
+  const handleToggleSuggestions = async (game: Game) => {
+    if (showMappingSuggestionsFor === game.id) {
+      setShowMappingSuggestionsFor(null);
+      return;
     }
-  }, [games, initialized, mappingSuggestions]);
+    setShowMappingSuggestionsFor(game.id);
+    if (!mappingSuggestions[game.id]) {
+      await fetchMappingSuggestionsForGame(game);
+    }
+  };
 
   // Инициализация при первом запуске
   useEffect(() => {
@@ -496,34 +496,9 @@ function App() {
         }));
       }
 
-      // 4. Try to auto-map games using existing DB mappings (or most popular mappings)
-      const mappedGames = await Promise.all(loadedGames.map(async game => {
-        if (game.appId) {
-          // If already mapped but no image, set the image
-          if (!game.image) {
-            return { ...game, image: getSteamGameIconUrl(game.appId) };
-          }
-          return game; // Already mapped and has image, skip
-        }
-
-        // Try to get existing mapping first
-        const { existing, suggestions } = await getMappingSuggestions(game.name);
-        if (existing) {
-          const suggestion = suggestions.find(s => s.appId === existing);
-          return { ...game, appId: existing, image: suggestion?.icon || getSteamGameIconUrl(existing) };
-        }
-
-        // If no existing mapping, try the most used one
-        const mostUsed = suggestions.find(s => s.isMostUsed);
-        if (mostUsed) {
-          return { ...game, appId: mostUsed.appId, image: mostUsed.icon || getSteamGameIconUrl(mostUsed.appId) };
-        }
-
-        return game;
-      }));
-
+      // Игры рендерим сразу — не ждём сеть
       setSettings(loadedSettings);
-      setGames(mappedGames);
+      setGames(loadedGames);
       setHistory(loadedHistory);
       setInitialized(true);
       if (!shareFailedRef.current) {
@@ -541,17 +516,42 @@ function App() {
       setShowMappingSuggestionsFor(null);
       setMappingSuggestions({});
 
-      // Preload prices for loaded games
+      // Авто-маппинг + цены — фоновыми батчами, не блокируя первый рендер
       if (loadedSettings.steam.enableIntegration) {
-        const gamesWithAppId = mappedGames.filter(g => g.appId);
-        const appIds = gamesWithAppId.map(g => g.appId as string);
-        if (appIds.length > 0) {
-          setPreloading(true);
-          const priceResults = await preloadPrices(appIds, loadedSettings.steam.region, false);
+        (async () => {
+          const enriched = new Map<string, { appId: string; image?: string }>();
+          for (let i = 0; i < loadedGames.length; i += 4) {
+            const batch = await Promise.all(loadedGames.slice(i, i + 4).map(async game => {
+              if (game.appId) {
+                return game.image ? null : { id: game.id, appId: game.appId, image: getSteamGameIconUrl(game.appId) };
+              }
+              const { existing, suggestions } = await getMappingSuggestions(game.name);
+              if (existing) {
+                const s = suggestions.find(s => s.appId === existing);
+                return { id: game.id, appId: existing, image: s?.icon || getSteamGameIconUrl(existing) };
+              }
+              const mostUsed = suggestions.find(s => s.isMostUsed);
+              return mostUsed ? { id: game.id, appId: mostUsed.appId, image: mostUsed.icon || getSteamGameIconUrl(mostUsed.appId) } : null;
+            }));
+            for (const g of batch) if (g) enriched.set(g.id, g);
+            if (enriched.size > 0) {
+              setGames(prev => prev.map(g => {
+                const m = enriched.get(g.id);
+                return m ? { ...g, appId: g.appId || m.appId, image: g.image || m.image } : g;
+              }));
+            }
+          }
 
-          const updatedGames = mappedGames.map(game => {
-            if (game.appId && priceResults[game.appId]) {
-              const data = priceResults[game.appId];
+          // Цены — после маппинга, одним запросом
+          const appIds = loadedGames
+            .map(g => g.appId || enriched.get(g.id)?.appId)
+            .filter((id): id is string => !!id);
+          if (appIds.length > 0) {
+            setPreloading(true);
+            const priceResults = await preloadPrices(appIds, loadedSettings.steam.region, false);
+            setGames(prev => prev.map(game => {
+              const data = game.appId && priceResults[game.appId];
+              if (!data) return game;
               const priceData: any = {};
               if (data.price != null) {
                 priceData.price = formatPrice(data.price, loadedSettings.steam.currency, loadedSettings.locale);
@@ -561,12 +561,10 @@ function App() {
                 priceData.originalPrice = formatPrice(data.originalPrice, loadedSettings.steam.currency, loadedSettings.locale);
               }
               return { ...game, ...priceData };
-            }
-            return game;
-          });
-          setGames(updatedGames);
-          setPreloading(false);
-        }
+            }));
+            setPreloading(false);
+          }
+        })();
       }
       
       // Очищаем URL от state параметра, чтобы не дублировать при перезагрузке
@@ -951,25 +949,22 @@ function App() {
 
         <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 ${
           listCollapsed
-            ? 'lg:col-span-1 lg:absolute lg:left-0 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 lg:rounded-l-none lg:border-l-0 lg:p-2 lg:w-auto lg:[writing-mode:vertical-rl] lg:opacity-40 lg:hover:opacity-100 lg:transition-opacity lg:duration-200 p-3'
+            ? 'lg:col-span-1 lg:absolute lg:left-0 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 lg:rounded-r-2xl lg:rounded-l-none lg:border-y lg:border-r lg:border-l-0 lg:p-0 lg:w-7 lg:h-28 lg:opacity-25 lg:hover:opacity-90 lg:transition-opacity lg:duration-200 p-3'
             : 'lg:col-span-1 p-6'
         }`}>
           <button
             onClick={() => setListCollapsed(c => { localStorage.setItem('fortuneWheelListCollapsed', c ? '0' : '1'); return !c; })}
             aria-expanded={!listCollapsed}
             title={t(settings.locale, listCollapsed ? 'games.expandList' : 'games.collapseList')}
-            className="w-full flex items-center justify-between text-xl font-bold py-1"
+            className={`w-full flex items-center justify-between text-xl font-bold py-1 ${listCollapsed ? 'lg:h-full lg:justify-center' : ''}`}
           >
-            <span className="flex items-center gap-2">
+            <span className={`flex items-center gap-2 ${listCollapsed ? 'lg:hidden' : ''}`}>
               <Gamepad2 className="text-indigo-400" />
-              <span className={listCollapsed ? 'lg:hidden' : ''}>{t(settings.locale, 'games.title')}</span>
-              ({games.length})
+              {t(settings.locale, 'games.title')} ({games.length})
             </span>
+            <ChevronRight size={18} className={`text-slate-300 ${listCollapsed ? 'hidden lg:block' : 'hidden'}`} />
             {listCollapsed ? (
-              <>
-                <ChevronDown size={20} className="text-slate-400 lg:hidden" />
-                <ChevronRight size={16} className="text-slate-400 hidden lg:block" />
-              </>
+              <ChevronDown size={20} className="text-slate-400 lg:hidden" />
             ) : (
               <ChevronUp size={20} className="text-slate-400" />
             )}
@@ -1104,9 +1099,9 @@ function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {mappingSuggestions[game.id] && mappingSuggestions[game.id].length > 0 && (
+                        {settings.steam.enableIntegration && (
                           <button
-                            onClick={() => setShowMappingSuggestionsFor(showMappingSuggestionsFor === game.id ? null : game.id)}
+                            onClick={() => handleToggleSuggestions(game)}
                             className="text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-2 py-1 min-w-[40px] min-h-[40px] bg-indigo-900/30 rounded transition-all flex items-center justify-center"
                             title={t(settings.locale, 'games.findGame')}
                           >
@@ -1166,7 +1161,7 @@ function App() {
                             {manualSearchLoading ? '...' : t(settings.locale, 'games.search')}
                           </button>
                         </div>
-                        {mappingSuggestions[game.id].map((suggestion) => (
+                        {mappingSuggestions[game.id]?.map((suggestion) => (
                           <button
                             key={suggestion.appId}
                             onClick={() => handleApplyMappingSuggestion(game.id, suggestion.appId)}
