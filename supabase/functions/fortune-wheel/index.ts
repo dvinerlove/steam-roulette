@@ -43,7 +43,7 @@ async function fetchSteamPriceFromAPI(appId: string, region: string) {
   };
   const cc = regionMap[region] || "kz";
   
-  let url = `https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=price_overview`;
+  let url = `https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=basic,price_overview`;
   const response = await fetch(url);
   if (!response.ok) return null;
 
@@ -56,7 +56,11 @@ async function fetchSteamPriceFromAPI(appId: string, region: string) {
   }
 
   if (!data[appId]?.success) return null;
-  
+
+  if (data[appId].data?.is_free) {
+    return { price: 0, discount: 0, originalPrice: 0, currency: null };
+  }
+
   const priceData = data[appId].data?.price_overview;
   if (!priceData) return null;
   
