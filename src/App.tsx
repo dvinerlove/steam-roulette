@@ -579,6 +579,23 @@ function App() {
     document.title = settings.titles.main || 'Колесо Фортуны';
   }, [settings.titles.main]);
 
+  // Escape закрывает любой открытый оверлей
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setSelectedGame(null);
+      setImportOpen(false);
+      setConfirmClearGamesOpen(false);
+      setSettingsOpen(false);
+      setHistoryOpen(false);
+      setShowSteamSearchResultsModal(false);
+      setShowWinScreenMappingModal(false);
+      setShowMappingSuggestionsFor(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   // Проверка связи с API — один раз после инициализации
   useEffect(() => {
     if (!initialized) return;
@@ -767,7 +784,7 @@ function App() {
   };
 
   return (
-    <div 
+    <main
       className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto"
       style={{
         backgroundImage: settings.customization.backgroundImage 
@@ -812,7 +829,7 @@ function App() {
               >
                 {/* Backdrop */}
                 <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedGame(null)} />
-                <div className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
+                <div role="dialog" aria-modal="true" aria-label="Выпавшая игра" className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
                   <div className="flex justify-end mb-2">
                     <button onClick={() => setSelectedGame(null)} className="text-white/60 hover:text-white transition-colors p-2">
                       <X size={24} />
@@ -1176,7 +1193,8 @@ function App() {
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
             onClick={() => setImportOpen(false)}
           >
-            <div 
+            <div
+              role="dialog" aria-modal="true" aria-label="Импорт списка игр"
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1222,7 +1240,8 @@ function App() {
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
             onClick={() => setConfirmClearGamesOpen(false)}
           >
-            <div 
+            <div
+              role="dialog" aria-modal="true" aria-label="Очистить список игр"
               className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1254,7 +1273,7 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </main>
   );
 }
 

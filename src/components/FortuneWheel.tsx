@@ -33,7 +33,8 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
   }, [totalRotation, controls]);
 
   useEffect(() => {
-    if (!isSpinning && !isWinPopupOpen && settings.wheel.idleSpin && games.length > 0) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!isSpinning && !isWinPopupOpen && settings.wheel.idleSpin && games.length > 0 && !reducedMotion) {
       lastTimeRef.current = performance.now();
       
       const animateIdle = (time: number) => {
