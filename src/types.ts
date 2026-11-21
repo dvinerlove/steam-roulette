@@ -91,7 +91,7 @@ export const DEFAULT_SETTINGS: Settings = {
     useProxy: true
   },
   wheel: {
-    spinDuration: 5,
+    spinDuration: 7,
     showGameNames: true,
     showImages: true,
     showColors: true,
