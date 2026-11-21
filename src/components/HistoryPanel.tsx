@@ -27,7 +27,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
           className="fixed inset-0 bg-black/50 z-50"
           onClick={onClose}
         >
-          <div 
+          <div
+            role="dialog" aria-modal="true" aria-label="История прокрутов"
             className="absolute right-0 top-0 h-full w-full md:w-[500px] bg-slate-800 border-l border-slate-700 shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -41,9 +42,11 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
             </div>
 
             <div className="p-6">
-              <button onClick={onClearHistory} className="w-full bg-red-600/50 hover:bg-red-600 text-slate-100 py-2 px-4 rounded-lg transition-colors mb-4">
-                Очистить историю
-              </button>
+              {history.length > 0 && (
+                <button onClick={onClearHistory} className="w-full bg-red-600/50 hover:bg-red-600 text-slate-100 py-2 px-4 rounded-lg transition-colors mb-4">
+                  Очистить историю
+                </button>
+              )}
               {history.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
                   История прокрутов пуста
