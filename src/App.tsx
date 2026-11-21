@@ -11,7 +11,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
@@ -951,7 +951,7 @@ function App() {
 
         <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 ${
           listCollapsed
-            ? 'lg:col-span-1 lg:absolute lg:top-0 lg:left-0 lg:z-20 p-3 lg:w-auto'
+            ? 'lg:col-span-1 lg:absolute lg:left-0 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 lg:rounded-l-none lg:border-l-0 lg:p-2 lg:w-auto lg:[writing-mode:vertical-rl] lg:opacity-40 lg:hover:opacity-100 lg:transition-opacity lg:duration-200 p-3'
             : 'lg:col-span-1 p-6'
         }`}>
           <button
@@ -962,9 +962,17 @@ function App() {
           >
             <span className="flex items-center gap-2">
               <Gamepad2 className="text-indigo-400" />
-              {t(settings.locale, 'games.title')} ({games.length})
+              <span className={listCollapsed ? 'lg:hidden' : ''}>{t(settings.locale, 'games.title')}</span>
+              ({games.length})
             </span>
-            {listCollapsed ? <ChevronDown size={20} className="text-slate-400" /> : <ChevronUp size={20} className="text-slate-400" />}
+            {listCollapsed ? (
+              <>
+                <ChevronDown size={20} className="text-slate-400 lg:hidden" />
+                <ChevronRight size={16} className="text-slate-400 hidden lg:block" />
+              </>
+            ) : (
+              <ChevronUp size={20} className="text-slate-400" />
+            )}
           </button>
           <AnimatePresence initial={false}>
           {!listCollapsed && (
