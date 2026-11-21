@@ -11,7 +11,7 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2 } from 'lucide-react';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2 } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
@@ -914,7 +914,7 @@ function App() {
           <div className="flex flex-col gap-3 mb-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                <Coins className="text-yellow-400" />
+                <Gamepad2 className="text-indigo-400" />
                 {t(settings.locale, 'games.title')} ({games.length})
               </h2>
             </div>
