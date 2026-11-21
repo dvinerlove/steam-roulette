@@ -51,6 +51,7 @@ function App() {
   const [manualSearchLoading, setManualSearchLoading] = useState<boolean>(false);
   const localeRef = useRef(settings.locale);
   localeRef.current = settings.locale;
+  const shareFailedRef = useRef(false);
   const [tempGameId, setTempGameId] = useState<string | null>(null);
   
   // Helper to normalize a game object to ensure all required fields are present
@@ -252,7 +253,7 @@ function App() {
 
   const saveEditedGame = () => {
     if (editingGame) {
-      setGames(games.map(g => g.id === editingGame.id ? { ...g, ...editForm, appId: editForm.appId || undefined } : g));
+      setGames(prev => prev.map(g => g.id === editingGame.id ? { ...g, ...editForm, appId: editForm.appId || undefined } : g));
       setEditingGame(null);
     }
   };
@@ -291,7 +292,7 @@ function App() {
         color: getGameColor(games.length), // Use current length for color calculation
         image: gameImage
       };
-      setGames([...games, newGame]);
+      setGames(prev => [...prev, newGame]);
       
       if (selectedAppId) {
         (async () => {
@@ -410,6 +411,7 @@ function App() {
           }
         } catch {
           setDbStatus('disconnected');
+          shareFailedRef.current = true;
           setDbError(t(loadedSettings.locale, 'err.shareLoad'));
           // Fallback to localStorage
           try {
@@ -505,8 +507,10 @@ function App() {
       setGames(mappedGames);
       setHistory(loadedHistory);
       setInitialized(true);
-      setDbStatus('connected');
-      setDbError(null);
+      if (!shareFailedRef.current) {
+        setDbStatus('connected');
+        setDbError(null);
+      }
       // Reset all UI state to avoid open modals!
       setEditingGame(null);
       setSettingsOpen(false);
@@ -601,7 +605,8 @@ function App() {
           const data = await response.json();
           if (data.database === 'connected') {
             setDbStatus('connected');
-            setDbError(null);
+            // Preserve the share-load error so a bad ?share= link isn't silently masked
+            if (!shareFailedRef.current) setDbError(null);
           } else {
             setDbStatus('disconnected');
             setDbError(t(localeRef.current, 'err.dbConn'));
@@ -637,7 +642,7 @@ function App() {
           color: getGameColor(games.length),
           image: getSteamGameIconUrl(dbMapping.app_id)
         };
-        setGames([...games, newGame]);
+        setGames(prev => [...prev, newGame]);
         (async () => fetchPriceInBackground(newGame.id, dbMapping.app_id))();
         return;
       } else {
@@ -653,7 +658,7 @@ function App() {
             color: getGameColor(games.length),
             image: searchResults[0].icon || getSteamGameIconUrl(searchResults[0].appId)
           };
-          setGames([...games, newGame]);
+          setGames(prev => [...prev, newGame]);
           (async () => {
             await saveGameMapping(gameName, searchResults[0].appId);
             fetchPriceInBackground(newGame.id, searchResults[0].appId);
@@ -665,7 +670,7 @@ function App() {
             name: gameName,
             color: getGameColor(games.length)
           };
-          setGames([...games, tempGame]);
+          setGames(prev => [...prev, tempGame]);
           setTempGameId(tempGame.id);
           setSteamSearchResults(searchResults);
           setGameNameToMap(gameName);
@@ -677,7 +682,7 @@ function App() {
             name: gameName,
             color: getGameColor(games.length)
           };
-          setGames([...games, newGame]);
+          setGames(prev => [...prev, newGame]);
         }
       }
     } else {
@@ -687,7 +692,7 @@ function App() {
         name: gameName,
         color: getGameColor(games.length)
       };
-      setGames([...games, newGame]);
+      setGames(prev => [...prev, newGame]);
     }
   };
 
@@ -699,13 +704,13 @@ function App() {
       appId: STEAM_APP_IDS[name],
       color: getGameColor(games.length + index)
     }));
-    setGames([...games, ...newGames]);
+    setGames(prev => [...prev, ...newGames]);
     setImportText('');
     setImportOpen(false);
   };
 
   const handleRemoveGame = (id: string) => {
-    setGames(games.filter(g => g.id !== id));
+    setGames(prev => prev.filter(g => g.id !== id));
   };
 
   const handleResult = async (game: Game) => {
@@ -756,7 +761,7 @@ function App() {
             originalPrice: data.originalPrice 
           };
           setSelectedGame(updatedGame);
-          setGames(games.map(g => g.id === game.id ? updatedGame : g));
+          setGames(prev => prev.map(g => g.id === game.id ? updatedGame : g));
         }
       } catch (error) {
         console.error('Error fetching price:', error);
@@ -833,7 +838,7 @@ function App() {
                     
                     <div>
                       <h3 className="text-white/70 uppercase tracking-widest text-xs font-bold mb-1">{t(settings.locale, 'win.label')}</h3>
-                      <h2 className="text-2xl sm:text-3xl font-black text-white">{selectedGame.name}</h2>
+                      <h2 className="text-2xl sm:text-3xl font-black text-white break-all max-w-full">{selectedGame.name}</h2>
                     </div>
 
                     {(settings.prices.showPrices || settings.prices.showDiscounts) && (
@@ -901,16 +906,16 @@ function App() {
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setImportOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.import')}>
                 <File size={20} />
-                <span className="text-sm sm:hidden">{t(settings.locale, 'action.import')}</span>
+                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.import')}</span>
               </button>
               <button onClick={() => setConfirmClearGamesOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-red-400 p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.clearList')}>
                 <Trash2 size={20} />
-                <span className="text-sm sm:hidden">{t(settings.locale, 'action.clear')}</span>
+                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.clear')}</span>
               </button>
               <div className="flex-1 min-w-[44px]">
                 <button onClick={handleCopyLink} className="w-full text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.share')}>
                   {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
-                  <span className="text-sm sm:hidden">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareLink')}</span>
+                  <span className="text-sm sm:hidden whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareLink')}</span>
                 </button>
                 {linkError && (
                   <div className="mt-1 text-xs text-red-400 break-all">
@@ -920,11 +925,11 @@ function App() {
               </div>
               <button onClick={() => setHistoryOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.history')}>
                 <HistoryIcon size={20} />
-                <span className="text-sm sm:hidden">{t(settings.locale, 'action.history')}</span>
+                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.history')}</span>
               </button>
               <button onClick={() => setSettingsOpen(true)} className="flex-1 min-w-[44px] text-slate-400 hover:text-white p-3 rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2" title={t(settings.locale, 'action.settings')}>
                 <SettingsIcon size={20} />
-                <span className="text-sm sm:hidden">{t(settings.locale, 'action.settings')}</span>
+                <span className="text-sm sm:hidden whitespace-nowrap">{t(settings.locale, 'action.settings')}</span>
               </button>
             </div>
           </div>
@@ -943,7 +948,7 @@ function App() {
             </div>
             <button
               onClick={handleAddGame}
-              className="bg-indigo-600 hover:bg-indigo-500 p-2 rounded-lg transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-500 p-2 min-w-[44px] min-h-[44px] rounded-lg transition-colors flex items-center justify-center"
             >
               <Plus size={24} />
             </button>

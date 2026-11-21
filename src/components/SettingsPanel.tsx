@@ -52,8 +52,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'appearance' | 'integration' | 'data'>('appearance');
 
+  if (!isOpen) return null;
+
   return (
-    <div className={`fixed inset-0 bg-black/60 z-50 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
+    <div className="fixed inset-0 bg-black/60 z-50 transition-opacity opacity-100" onClick={() => setIsOpen(false)}>
       <div role="dialog" aria-modal="true" aria-label={t(settings.locale, 'settings.title')} className="absolute right-0 top-0 h-full w-full md:w-[600px] bg-slate-800 border-l border-slate-700 shadow-2xl overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-6 sticky top-0 bg-slate-800 border-b border-slate-700 z-10 flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -66,7 +68,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         </div>
 
-        <div className="p-4 border-b border-slate-700 flex gap-2">
+        <div className="p-4 border-b border-slate-700 flex gap-2 flex-wrap">
           {[
             { id: 'appearance', icon: Palette, label: t(settings.locale, 'settings.appearance') },
             { id: 'integration', icon: Gamepad2, label: t(settings.locale, 'settings.integrations') },

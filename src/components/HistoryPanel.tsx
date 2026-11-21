@@ -57,10 +57,10 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
                 <div className="space-y-3">
                   {history.slice().reverse().map((item) => (
                     <div key={item.id} className="flex items-center justify-between bg-slate-700/50 p-4 rounded-xl border border-slate-600">
-                      <div className="flex items-center gap-4">
-                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.game.color }} />
-                        <div>
-                          <div className="text-slate-200 font-semibold">{item.game.name}</div>
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: item.game.color }} />
+                        <div className="min-w-0">
+                          <div className="text-slate-200 font-semibold truncate">{item.game.name}</div>
                           {item.game.price && (
                             <div className="flex items-center gap-2 text-sm">
                               <Coins size={14} className="text-green-400" />
@@ -69,7 +69,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isOpen, onClose, o
                           )}
                         </div>
                       </div>
-                      <div className="text-xs text-slate-400">{formatTime(item.timestamp)}</div>
+                      <div className="text-xs text-slate-400 flex-shrink-0 ml-2">{formatTime(item.timestamp)}</div>
                     </div>
                   ))}
                 </div>

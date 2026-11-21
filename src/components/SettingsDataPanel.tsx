@@ -121,14 +121,14 @@ const SettingsDataPanel: React.FC<SettingsDataPanelProps> = ({
           <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
             {games.map(game => (
               <div key={game.id} className="flex items-center justify-between bg-slate-700/40 p-3 rounded-lg group">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: game.color }} />
-                  <div>
-                    <span className="text-slate-200 text-sm font-medium">{game.name}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: game.color }} />
+                  <div className="min-w-0">
+                    <span className="text-slate-200 text-sm font-medium truncate block">{game.name}</span>
                     {game.appId && <span className="text-xs text-slate-500 block">ID: {game.appId}</span>}
                   </div>
                 </div>
-                <button onClick={() => handleEditGame(game)} className="p-2 text-slate-400 hover:text-indigo-400 rounded hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition">
+                <button onClick={() => handleEditGame(game)} className="p-2 text-slate-400 hover:text-indigo-400 rounded hover:bg-slate-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition flex-shrink-0">
                   <Edit2 size={16} />
                 </button>
               </div>

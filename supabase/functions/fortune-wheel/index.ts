@@ -45,8 +45,16 @@ async function fetchSteamPriceFromAPI(appId: string, region: string) {
   
   let url = `https://store.steampowered.com/api/appdetails?appids=${appId}&cc=${cc}&filters=price_overview`;
   const response = await fetch(url);
-  const data = await response.json();
-  
+  if (!response.ok) return null;
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    // Steam returns HTML (region block/age gate) for some cc/appId combos
+    return null;
+  }
+
   if (!data[appId]?.success) return null;
   
   const priceData = data[appId].data?.price_overview;
@@ -400,8 +408,14 @@ Deno.serve(async (req) => {
     // Get share
     if (req.method === "GET" && (pathname.startsWith("/shares/") || pathname.startsWith("/api/shares/"))) {
       const id = pathname.split("/").pop() || "";
-      const { data, error } = await supabase.from("shares").select("data").eq("id", id).single();
+      const { data, error } = await supabase.from("shares").select("data").eq("id", id).maybeSingle();
       if (error) throw error;
+      if (!data) {
+        return new Response(
+          JSON.stringify({ error: "Share not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify(data.data),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
