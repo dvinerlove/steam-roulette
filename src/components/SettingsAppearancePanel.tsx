@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Settings } from '../types';
 import { Settings as SettingsIcon, Palette, Volume2, VolumeX, Zap } from 'lucide-react';
 import { t, type Locale } from '../i18n';
@@ -15,6 +15,7 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
   clearAll,
 }) => {
   const loc = settings.locale;
+  const [confirmReset, setConfirmReset] = useState(false);
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -281,19 +282,6 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-700">
-            <button
-              onClick={() => {
-                if (confirm(t(loc, 'appearance.resetConfirm'))) {
-                  clearAll();
-                }
-              }}
-              className="w-full bg-red-600/50 hover:bg-red-600 text-slate-100 py-2 px-4 rounded-lg transition-colors"
-            >
-              {t(loc, 'appearance.resetAll')}
-            </button>
-          </div>
-
           <div className="grid grid-cols-2 gap-3 pt-2">
             <label className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
               <span className="text-slate-300 text-sm">{t(loc, 'appearance.showNames')}</span>
@@ -343,6 +331,24 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="pt-4 border-t border-red-900/40">
+        <p className="text-slate-500 text-xs mb-2">{t(loc, 'appearance.resetHint')}</p>
+        <button
+          onClick={() => {
+            if (confirmReset) {
+              clearAll();
+              setConfirmReset(false);
+            } else {
+              setConfirmReset(true);
+              setTimeout(() => setConfirmReset(false), 4000);
+            }
+          }}
+          className={`w-full py-2 px-4 rounded-lg transition-colors ${confirmReset ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-red-600/30 hover:bg-red-600/60 text-red-200'}`}
+        >
+          {confirmReset ? t(loc, 'appearance.resetConfirm') : t(loc, 'appearance.resetAll')}
+        </button>
       </div>
     </div>
   );
