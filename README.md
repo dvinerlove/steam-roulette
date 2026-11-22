@@ -13,7 +13,7 @@ A web app that picks a random game from your list — spin the wheel and let it 
 
 ![Fortune Wheel — screenshot](docs/screenshot.png)
 
-## ✨ Features
+## Features
 
 - **Random pick** — fair RNG (`crypto.getRandomValues`) with a smooth decelerating spin and a soft tick sound that fades as it slows
 - **Steam integration** — auto-matches games in Steam, live prices and discounts for your region, game covers on wheel sectors
@@ -29,7 +29,7 @@ A web app that picks a random game from your list — spin the wheel and let it 
 - **i18n** — English/Russian UI, auto-detected; Steam region & currency defaults follow the locale
 - **PWA-friendly** — no sign-up, all data stays in your browser; new visitors get a demo wheel to play with
 
-## 🚀 Getting started
+## Getting started
 
 ```bash
 npm install
@@ -38,7 +38,7 @@ npm run dev        # http://localhost:5173/fortune-wheel/
 
 Steam prices and short links need `VITE_API_URL` — see [.env.example](.env.example) (Supabase Edge Function in `supabase/functions/fortune-wheel`).
 
-## 📜 Scripts
+## Scripts
 
 | Command | What it does |
 |---|---|
@@ -48,7 +48,7 @@ Steam prices and short links need `VITE_API_URL` — see [.env.example](.env.exa
 | `npm run preview` | preview the build |
 | `npm run deploy` | build + deploy to GitHub Pages |
 
-## 🛠 Stack
+## Stack
 
 React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Framer Motion · Lucide · Supabase Edge Functions · GitHub Pages (CI in `.github/workflows/deploy.yml`)
 
@@ -61,6 +61,6 @@ React 19 · TypeScript · Vite 8 · Tailwind CSS 4 · Framer Motion · Lucide ·
 
 </details>
 
-## 📄 License
+## License
 
 [MIT](LICENSE)

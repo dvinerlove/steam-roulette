@@ -8,7 +8,9 @@ Everything ready to copy-paste. Links:
 - GitHub: https://github.com/dvinerlove/fortune-wheel
 - Screenshots: `docs/screenshot.png`, `docs/screenshot-mobile.png`, `public/og-image.png`
 
-Positioning (from competitor research): don't say "spin the wheel" (saturated, wrong audience — teachers and raffles). Say **"Steam roulette" / "steam game picker"** — that's the niche. No Russian-language competitor exists — use it.
+Positioning (from [competitor research](competitors-2026-11.md)): don't say "spin the wheel" (saturated, wrong audience — teachers and raffles). Say **"Steam roulette" / "steam game picker"** — that's the niche. RU competitors exist (SGG, imho.run, NXTO, gamechosis, steam-pixel, Playpill) but **none have shareable custom-list wheels, live prices on sectors, or elimination mode** — that's the exact claim to use.
+
+Full channel map: [channels-2026-11.md](channels-2026-11.md).
 
 ---
 
@@ -32,7 +34,7 @@ Positioning (from competitor research): don't say "spin the wheel" (saturated, w
 > Link: https://dvinerlove.github.io/fortune-wheel/
 > Source (MIT): https://github.com/dvinerlove/fortune-wheel
 >
-> Would love feedback — what would make you actually use this? Steam library import is on the roadmap.
+> Would love feedback — what would make you actually use this? (I tried Steam library auto-import and dropped it: public-profile requirement locked out too many people. If that's the dealbreaker for you, say so — it'll tell me the demand is real.)
 
 Attach `docs/screenshot.png`.
 
