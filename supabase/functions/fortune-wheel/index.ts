@@ -406,19 +406,9 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Custom images are base64 data-URLs up to ~1.4MB each — the main share
-        // bloat. Strip them server-side: colors/steam icons survive, DB stays small.
-        if (shareData && Array.isArray(shareData.games)) {
-          for (const g of shareData.games) {
-            if (typeof g?.image === "string" && g.image.startsWith("data:")) {
-              delete g.image;
-            }
-          }
-        }
-
         // Generate a hash of the share data
         const shareDataString = JSON.stringify(shareData);
-        if (shareDataString.length > 200_000) {
+        if (shareDataString.length > 5_000_000) {
           return new Response(
             JSON.stringify({ error: "Share payload too large" }),
             { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
