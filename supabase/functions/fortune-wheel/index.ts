@@ -323,6 +323,7 @@ Deno.serve(async (req) => {
     }
 
     // Steam search
+    if (req.method === "GET" && (pathname === "/api/steam/search" || pathname === "/steam/search")) {
       const url = new URL(req.url);
       const query = url.searchParams.get("q") || "";
       const results = await searchSteamGames(query);
