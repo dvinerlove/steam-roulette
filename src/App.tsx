@@ -949,7 +949,7 @@ function App() {
 
         <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity] lg:duration-300 lg:ease-out ${
           listCollapsed
-            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:hover:shadow-[0_0_24px_rgba(99,102,241,0.35)] lg:cursor-pointer group'
+            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:cursor-pointer group'
             : 'p-6 lg:w-1/3'
         }`}>
           <button
