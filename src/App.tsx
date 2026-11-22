@@ -963,11 +963,7 @@ function App() {
               {t(settings.locale, 'games.title')} ({games.length})
             </span>
             {listCollapsed && (
-              <span className="hidden lg:flex flex-col items-center gap-1.5 py-1">
-                <Gamepad2 size={18} className="text-indigo-400 transition-transform duration-200 group-hover:scale-110" />
-                <span className="text-[11px] leading-none text-slate-400 transition-colors duration-200 group-hover:text-slate-200">{games.length}</span>
-                <ChevronRight size={14} className="text-slate-500 mt-0.5 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
-              </span>
+              <ChevronRight size={16} className="hidden lg:block text-slate-500 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
             )}
             {listCollapsed ? (
               <ChevronDown size={20} className="text-slate-400 lg:hidden" />
