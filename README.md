@@ -17,7 +17,7 @@ A web app that picks a random game from your list — spin the wheel and let it 
 
 - **Random pick** — fair RNG (`crypto.getRandomValues`) with a smooth decelerating spin and a soft tick sound that fades as it slows
 - **Steam integration** — auto-matches games in Steam, live prices and discounts for your region, game covers on wheel sectors
-- **Link sharing** — a short link preserves your game list and all settings (Supabase Edge Function + URL-state fallback)
+- **Link sharing** — a short link preserves your game list and all settings, as an immutable snapshot *or* a live link you can update later from the same browser (Supabase Edge Function + URL-state fallback)
 - **Wheel presets** — save several game lists (e.g. "Backlog", "Co-op night") and switch between them
 - **Hide games** — keep a game in the list but off the wheel (not in the mood today)
 - **Elimination mode** — "Remove winner" drops the winning game from the wheel until nothing's left
