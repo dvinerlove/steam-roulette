@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dvinerlove.github.io/fortune-wheel/sitemap.xml
+Sitemap: https://dvinerlove.github.io/steam-roulette/sitemap.xml

@@ -1,4 +1,4 @@
-/* Fortune Wheel service worker.
+/* Steam Roulette service worker.
    Hashed /assets/* -> cache-first. Navigation -> network-first with offline fallback.
    Everything else (API calls, cross-origin) bypasses the cache entirely. */
 const CACHE = "fw-v1";
@@ -35,7 +35,7 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  if (url.pathname.startsWith("/fortune-wheel/assets/")) {
+  if (url.pathname.startsWith("/steam-roulette/assets/")) {
     e.respondWith(
       caches.match(request).then((cached) =>
         cached ||

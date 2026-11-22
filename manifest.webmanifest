@@ -1,9 +1,9 @@
 {
-  "name": "Fortune Wheel — pick a random game",
-  "short_name": "Fortune Wheel",
+  "name": "Steam Roulette — pick a random game",
+  "short_name": "Steam Roulette",
   "description": "Spin a wheel over your game list. Live Steam prices on every sector, shareable links, no sign-up.",
-  "start_url": "/fortune-wheel/",
-  "scope": "/fortune-wheel/",
+  "start_url": "/steam-roulette/",
+  "scope": "/steam-roulette/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
