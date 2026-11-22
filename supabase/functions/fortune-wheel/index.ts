@@ -11,6 +11,34 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
+// Per-IP rate limit backed by the rate_limits table.
+// Returns true if the request is allowed, false if over the limit.
+async function checkRateLimit(ip: string, bucket: string, limit: number, windowSec: number): Promise<boolean> {
+  const key = `${bucket}:${ip}`;
+  const now = Date.now();
+  try {
+    const { data } = await supabase.from("rate_limits").select("count, window_start").eq("key", key).maybeSingle();
+    if (data && now - new Date(data.window_start).getTime() < windowSec * 1000) {
+      if (data.count >= limit) return false;
+      await supabase.from("rate_limits").update({ count: data.count + 1 }).eq("key", key);
+      return true;
+    }
+    await supabase.from("rate_limits").upsert(
+      { key, count: 1, window_start: new Date(now).toISOString() },
+      { onConflict: "key" }
+    );
+    return true;
+  } catch (e) {
+    // rate_limits table missing/unreachable — don't break the app, just log
+    console.error("Rate limit check failed:", e);
+    return true;
+  }
+}
+
+function clientIp(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+}
+
 // Helper to normalize strings for comparison (ignore case, punctuation, extra spaces)
 function normalizeString(s: string): string {
   return s.toLowerCase()
@@ -341,6 +369,12 @@ Deno.serve(async (req) => {
 
     // Save game mapping (with usage tracking)
     if (req.method === "POST" && (pathname === "/api/mappings" || pathname === "/mappings")) {
+      if (!await checkRateLimit(clientIp(req), "mappings", 60, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        );
+      }
       const { gameName, appId } = await req.json();
       const decodedName = decodeURIComponent(gameName);
 
@@ -386,6 +420,12 @@ Deno.serve(async (req) => {
 
     // Create share
     if (req.method === "POST" && (pathname === "/shares" || pathname === "/api/shares")) {
+      if (!await checkRateLimit(clientIp(req), "shares", 30, 3600)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "3600" } }
+        );
+      }
       try {
         const body = await req.json();
         const shareData = body.state || body.data;
@@ -399,6 +439,12 @@ Deno.serve(async (req) => {
 
         // Generate a hash of the share data
         const shareDataString = JSON.stringify(shareData);
+        if (shareDataString.length > 200_000) {
+          return new Response(
+            JSON.stringify({ error: "Share payload too large" }),
+            { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const encoder = new TextEncoder();
         const data = encoder.encode(shareDataString);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -525,6 +571,12 @@ Deno.serve(async (req) => {
 
     // Preload multiple prices
     if (req.method === "POST" && (pathname === "/prices/preload" || pathname === "/api/prices/preload")) {
+      if (!await checkRateLimit(clientIp(req), "preload", 10, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        );
+      }
       const { appIds, region = "kz", force = false } = await req.json(); // Added force
       const results = [];
       const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
