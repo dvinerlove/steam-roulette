@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Game, Settings } from '../types';
+import type { Settings } from '../types';
 
 import SettingsAppearancePanel from './SettingsAppearancePanel';
 import SettingsIntegrationPanel from './SettingsIntegrationPanel';
@@ -18,17 +18,9 @@ interface SettingsPanelProps {
   dbStatus: 'loading' | 'connected' | 'disconnected';
   dbError: string | null;
   // Props for Data Panel
-  games: Game[];
-  setGames: React.Dispatch<React.SetStateAction<Game[]>>;
   preloading: boolean;
   preloadProgress: number;
   handlePreloadPrices: () => Promise<void>;
-  editingGame: Game | null;
-  setEditingGame: React.Dispatch<React.SetStateAction<Game | null>>;
-  editForm: { name: string; appId: string; color: string; image: string; };
-  setEditForm: React.Dispatch<React.SetStateAction<{ name: string; appId: string; color: string; image: string; }>>;
-  saveEditedGame: () => void;
-  handleEditGame: (game: Game) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -39,17 +31,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   clearAll,
   dbStatus,
   dbError,
-  games,
-  setGames,
   preloading,
   preloadProgress,
   handlePreloadPrices,
-  editingGame,
-  setEditingGame,
-  editForm,
-  setEditForm,
-  saveEditedGame,
-  handleEditGame,
 }) => {
   const [activeTab, setActiveTab] = useState<'appearance' | 'integration' | 'data'>('appearance');
 
@@ -74,7 +58,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <SettingsIcon size={28} /> {t(settings.locale, 'settings.title')}
           </h2>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700">
+            <button onClick={() => setIsOpen(false)} aria-label={t(settings.locale, 'action.close')} title={t(settings.locale, 'action.close')} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700">
               ✕
             </button>
           </div>
@@ -115,20 +99,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             />
           )}
           {activeTab === 'data' && (
-            <SettingsDataPanel 
-              settings={settings} 
-              setSettings={setSettings} 
-              games={games} 
-              setGames={setGames} 
-              preloading={preloading} 
-              preloadProgress={preloadProgress} 
-              handlePreloadPrices={handlePreloadPrices} 
-              editingGame={editingGame} 
-              setEditingGame={setEditingGame} 
-              editForm={editForm} 
-              setEditForm={setEditForm} 
-              saveEditedGame={saveEditedGame} 
-              handleEditGame={handleEditGame} 
+            <SettingsDataPanel
+              settings={settings}
+              setSettings={setSettings}
+              preloading={preloading}
+              preloadProgress={preloadProgress}
+              handlePreloadPrices={handlePreloadPrices}
             />
           )}
         </div>

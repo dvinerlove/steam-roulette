@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Game, Settings, HistoryItem } from './types';
-import { INITIAL_GAMES, STEAM_APP_IDS, getGameColor } from './constants';
+import { getGameColor } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
 import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, type MappingSuggestion } from './utils/steam';
 import type { SteamSearchResult } from './utils/steam';
@@ -11,7 +11,8 @@ import SettingsPanel from './components/SettingsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import EditGameForm from './components/EditGameForm';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp, ChevronRight, Shuffle, Eye, EyeOff, Save } from 'lucide-react';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
@@ -28,6 +29,9 @@ function App() {
   const [listCollapsed, setListCollapsed] = useState(() => localStorage.getItem('fortuneWheelListCollapsed') === '1');
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
+  const [steamIdInput, setSteamIdInput] = useState('');
+  const [steamImportLoading, setSteamImportLoading] = useState(false);
+  const [steamImportError, setSteamImportError] = useState<string | null>(null);
   const [confirmClearGamesOpen, setConfirmClearGamesOpen] = useState(false);
   const [steamSearchResults, setSteamSearchResults] = useState<SteamSearchResult[]>([]);
   const [showSteamSearchResultsModal, setShowSteamSearchResultsModal] = useState(false);
@@ -36,8 +40,16 @@ function App() {
   const [gameToMapOnWinScreen, setGameToMapOnWinScreen] = useState<Game | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [presets, setPresets] = useState<{ name: string; games: Game[] }[]>(() => {
+    try { const raw = localStorage.getItem('fortuneWheelPresets'); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  });
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [presetSaving, setPresetSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [linkCopiedFull, setLinkCopiedFull] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
   const [dbError, setDbError] = useState<string | null>(null);
@@ -54,6 +66,8 @@ function App() {
   localeRef.current = settings.locale;
   const shareFailedRef = useRef(false);
   const [tempGameId, setTempGameId] = useState<string | null>(null);
+  // Скрытые игры не идут на колесо, но остаются в списке
+  const visibleGames = useMemo(() => games.filter(g => !g.hidden), [games]);
   const confettiBits = useMemo(() => {
     if (!selectedGame || !settings.wheel.confetti) return [];
     const palette = games.map(g => g.color);
@@ -65,8 +79,7 @@ function App() {
       rot: (Math.random() > 0.5 ? 1 : -1) * (180 + Math.random() * 360),
       w: 6 + Math.random() * 6,
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGame, settings.wheel.confetti]);
+  }, [selectedGame, settings.wheel.confetti, games]);
   
   // Helper to normalize a game object to ensure all required fields are present
   const normalizeGame = (game: any, index: number = 0): Game => ({
@@ -77,7 +90,8 @@ function App() {
     discount: game.discount,
     originalPrice: game.originalPrice,
     color: game.color || getGameColor(index),
-    image: game.image
+    image: game.image,
+    hidden: game.hidden
   });
 
   const clearAll = () => {
@@ -87,12 +101,14 @@ function App() {
     localStorage.removeItem('fortuneWheelSettings');
     localStorage.removeItem('fortuneWheelGames');
     localStorage.removeItem('fortuneWheelHistory');
-    // Don't clear shareDB so saved share links still work!
   };
 
   const handleCopyLink = async () => {
+    if (sharing) return;
+    setSharing(true);
     setLinkError(null);
     setLinkCopied(false);
+    setLinkCopiedFull(false);
     
     const url = new URL(window.location.href);
 
@@ -135,9 +151,8 @@ function App() {
           throw new Error(t(settings.locale, 'err.apiStatus', { code: response.status }));
         }
       }
-    } catch (error) {
-      // Показываем ошибку, но всё равно копируем ссылку (fallback на state-параметр)
-      setLinkError(error instanceof Error ? error.message : t(settings.locale, 'err.shareFailed'));
+    } catch {
+      // Короткая ссылка не получилась — fallback на state-параметр, это не ошибка для юзера
       url.searchParams.set('state', encodedState);
       url.searchParams.delete('share');
     }
@@ -146,19 +161,24 @@ function App() {
       await navigator.clipboard.writeText(url.toString());
     } catch {
       setLinkError(t(settings.locale, 'err.shareFailed'));
+      setSharing(false);
       return;
     }
     if (shortLinkSuccess) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
+    } else {
+      setLinkCopiedFull(true);
+      setTimeout(() => setLinkCopiedFull(false), 2000);
     }
+    setSharing(false);
   };
 
   const handlePreloadPrices = async () => {
     setPreloading(true);
     setPreloadProgress(0);
     const gamesWithAppId = games.filter(g => g.appId);
-    const appIds = gamesWithAppId.map(g => g.appId as string);
+    const appIds = gamesWithAppId.map(g => g.appId!);
     
     if (appIds.length === 0) {
       setPreloading(false);
@@ -209,7 +229,7 @@ function App() {
         ?? suggestions.find(s => normalizeStringForComparison(transliterateRussian(s.name)) === transliteratedGameName);
 
       if (autoMapSuggestion) {
-        await handleApplyMappingSuggestion(game.id, autoMapSuggestion.appId);
+        await handleApplyMappingSuggestion(game.id, autoMapSuggestion.appId, autoMapSuggestion.icon);
       }
     }
     
@@ -242,14 +262,14 @@ function App() {
   };
 
   // Handle applying a mapping suggestion to game
-  const handleApplyMappingSuggestion = async (gameId: string, appId: string) => {
+  const handleApplyMappingSuggestion = async (gameId: string, appId: string, icon?: string) => {
     // Find game
     const game = games.find(g => g.id === gameId);
     if (!game) return;
 
-    // Get the suggestion to find its icon
+    // Get the suggestion to find its icon (переданная напрямую приоритетнее — mappingSuggestions может ещё не закоммититься)
     const suggestion = mappingSuggestions[gameId]?.find(s => s.appId === appId);
-    const gameImage = suggestion?.icon || getSteamGameIconUrl(appId);
+    const gameImage = icon || suggestion?.icon || getSteamGameIconUrl(appId);
 
     // Update game locally FIRST, show immediately
     const updatedGames = games.map(g => g.id === gameId ? { ...g, appId: appId, image: gameImage } : g);
@@ -271,10 +291,15 @@ function App() {
   };
 
   const saveEditedGame = () => {
-    if (editingGame) {
-      setGames(prev => prev.map(g => g.id === editingGame.id ? { ...g, ...editForm, appId: editForm.appId || undefined } : g));
-      setEditingGame(null);
-    }
+    if (!editingGame || !editForm.name.trim()) return;
+    const appId = editForm.appId.trim() || undefined;
+    const appIdChanged = appId !== editingGame.appId;
+    setGames(prev => prev.map(g => g.id === editingGame.id ? {
+      ...g, ...editForm, name: editForm.name.trim(), appId,
+      ...(appIdChanged ? { price: undefined, discount: undefined, originalPrice: undefined } : {})
+    } : g));
+    if (appIdChanged && appId) fetchPriceInBackground(editingGame.id, appId);
+    setEditingGame(null);
   };
 
   const handleEditGame = (game: Game) => {
@@ -336,8 +361,6 @@ function App() {
           await saveGameMapping(gameNameToMap, selectedAppId);
           fetchPriceInBackground(currentTempGameId, selectedAppId);
         })();
-      } else {
-        // If no appId selected, just leave the temp game as is
       }
     }
   };
@@ -364,15 +387,10 @@ function App() {
           try {
             const data = await fetchSteamPrice(selectedAppId, settings);
             if (data) {
-              setGames(prevGames => {
-                const game = prevGames.find(g => g.id === originalGame.id);
-                if (game && game.appId === selectedAppId) {
-                  const finalUpdatedGame = { ...game, ...data };
-                  setSelectedGame(finalUpdatedGame);
-                  return prevGames.map(g => g.id === originalGame.id ? finalUpdatedGame : g);
-                }
-                return prevGames;
-              });
+              setGames(prevGames => prevGames.map(g =>
+                g.id === originalGame.id && g.appId === selectedAppId ? { ...g, ...data } : g));
+              setSelectedGame(prev =>
+                prev && prev.id === originalGame.id && prev.appId === selectedAppId ? { ...prev, ...data } : prev);
             }
           } catch (error) {
             console.error('Error fetching price on win screen after mapping:', error);
@@ -432,23 +450,6 @@ function App() {
           setDbStatus('disconnected');
           shareFailedRef.current = true;
           setDbError(t(loadedSettings.locale, 'err.shareLoad'));
-          // Fallback to localStorage
-          try {
-            const shareDB = JSON.parse(localStorage.getItem('shareDB') || '{}');
-            const sharedState = shareDB[shareId];
-
-            if (sharedState) {
-              if (sharedState.settings) {
-                loadedSettings = mergeSettings(sharedState.settings);
-              }
-              if (sharedState.games) {
-                loadedGames = sharedState.games.map(normalizeGame);
-                loadedFromShare = true;
-              }
-            }
-          } catch (err2) {
-            console.error('Failed to load from localStorage:', err2);
-          }
         }
       } else if (stateParam) {
         try {
@@ -465,35 +466,27 @@ function App() {
         }
       }
 
-      // 2. Если не из шейринга, загружаем из localStorage
+      // 2. Если не из шейринга, загружаем из localStorage — каждый ключ независимо,
+      // чтобы один битый JSON не ронял остальные
       if (!loadedFromShare) {
-        try {
-          const savedSettings = localStorage.getItem('fortuneWheelSettings');
-          const savedGames = localStorage.getItem('fortuneWheelGames');
-          const savedHistory = localStorage.getItem('fortuneWheelHistory');
-          
-          if (savedSettings) {
-            loadedSettings = mergeSettings(JSON.parse(savedSettings));
+        const loadJson = (key: string) => {
+          try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+          } catch (err) {
+            console.error(`Failed to parse ${key}:`, err);
+            return null;
           }
-          if (savedGames) {
-            loadedGames = JSON.parse(savedGames).map(normalizeGame);
-          }
-          if (savedHistory) {
-            loadedHistory = JSON.parse(savedHistory);
-          }
-        } catch (err) {
-          console.error('Failed to load from localStorage:', err);
+        };
+        const savedSettings = loadJson('fortuneWheelSettings');
+        const savedGames = loadJson('fortuneWheelGames');
+        const savedHistory = loadJson('fortuneWheelHistory');
+        if (savedSettings) loadedSettings = mergeSettings(savedSettings);
+        if (Array.isArray(savedGames)) loadedGames = savedGames.map(normalizeGame);
+        if (Array.isArray(savedHistory)) {
+          loadedHistory = savedHistory.map((item: any) =>
+            item?.game ? { ...item, game: normalizeGame(item.game) } : item).filter(Boolean);
         }
-      }
-
-      // 3. Если ничего не загружено, используем дефолтные игры
-      if (loadedGames.length === 0) {
-        loadedGames = INITIAL_GAMES.map((name, index) => ({
-          id: uid(),
-          name,
-          appId: STEAM_APP_IDS[name],
-          color: getGameColor(index)
-        }));
       }
 
       // Игры рендерим сразу — не ждём сеть
@@ -722,12 +715,60 @@ function App() {
     const newGames: Game[] = lines.map((name, index) => ({
       id: uid(),
       name,
-      appId: STEAM_APP_IDS[name],
       color: getGameColor(games.length + index)
     }));
     setGames(prev => [...prev, ...newGames]);
     setImportText('');
     setImportOpen(false);
+  };
+
+  const persistPresets = (next: { name: string; games: Game[] }[]) => {
+    setPresets(next);
+    try { localStorage.setItem('fortuneWheelPresets', JSON.stringify(next)); } catch { /* quota */ }
+  };
+  const savePreset = () => {
+    const name = presetName.trim() || selectedPreset;
+    if (!name || games.length === 0) return;
+    persistPresets([...presets.filter(p => p.name !== name), { name, games }]);
+    setSelectedPreset(name);
+    setPresetSaving(false);
+    setPresetName('');
+  };
+  const loadPreset = (name: string) => {
+    setSelectedPreset(name);
+    const p = presets.find(p => p.name === name);
+    if (p) setGames(p.games.map(g => normalizeGame(g)));
+  };
+  const deletePreset = () => {
+    if (!selectedPreset) return;
+    persistPresets(presets.filter(p => p.name !== selectedPreset));
+    setSelectedPreset('');
+  };
+
+  const handleImportLibrary = async () => {
+    const id = steamIdInput.trim();
+    if (!id || !API_URL) return;
+    setSteamImportLoading(true);
+    setSteamImportError(null);
+    try {
+      // Достаём vanity/id если вставили ссылку на профиль
+      const m = id.match(/steamcommunity\.com\/(?:id|profiles)\/([^/?#]+)/);
+      const sid = m ? m[1] : id;
+      const res = await fetch(`${API_URL}/api/library/${encodeURIComponent(sid)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      const existing = new Set(games.map(g => g.name.toLowerCase()));
+      const newGames: Game[] = (data.games as { name: string; appId: string }[])
+        .filter(g => !existing.has(g.name.toLowerCase()))
+        .map((g, i) => ({ id: uid(), name: g.name, appId: g.appId, color: getGameColor(games.length + i) }));
+      setGames(prev => [...prev, ...newGames]);
+      setImportOpen(false);
+      setSteamIdInput('');
+    } catch (e) {
+      setSteamImportError(e instanceof Error ? e.message : t(settings.locale, 'err.shareFailed'));
+    } finally {
+      setSteamImportLoading(false);
+    }
   };
 
   const handleRemoveGame = (id: string) => {
@@ -773,7 +814,7 @@ function App() {
     if (gameWithAppId.appId && !gameWithAppId.price && settings.steam.enableIntegration) {
       setLoadingPrices(true);
       try {
-        const data = await fetchSteamPrice(gameWithAppId.appId as string, settings);
+        const data = await fetchSteamPrice(gameWithAppId.appId, settings);
         if (data) {
           const updatedGame = { 
             ...gameWithAppId, 
@@ -826,8 +867,8 @@ function App() {
           </div>
 
           <div className="relative">
-            <FortuneWheel 
-              games={games} 
+            <FortuneWheel
+              games={visibleGames}
               onResult={handleResult} 
               isSpinning={isSpinning} 
               setIsSpinning={setIsSpinning}
@@ -876,8 +917,8 @@ function App() {
                       className="text-white/60 hover:text-white transition-colors p-2 flex items-center gap-1.5 text-sm"
                       title={t(settings.locale, 'action.shareWheel')}
                     >
-                      {linkCopied ? <Check size={18} className="text-emerald-400" /> : <Link2 size={18} />}
-                      {linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareWheel')}
+                      {linkCopied || linkCopiedFull ? <Check size={18} className="text-emerald-400" /> : <Link2 size={18} />}
+                      {linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : t(settings.locale, 'action.shareWheel')}
                     </button>
                     <button onClick={() => setSelectedGame(null)} className="text-white/60 hover:text-white transition-colors p-2">
                       <X size={24} />
@@ -939,6 +980,12 @@ function App() {
                         {t(settings.locale, 'win.viewOnSteam')}
                       </a>
                     )}
+                    <button
+                      onClick={() => { setGames(prev => prev.filter(g => g.id !== selectedGame.id)); setSelectedGame(null); }}
+                      className="text-red-300/70 hover:text-red-200 text-sm transition-colors mt-3 underline underline-offset-4"
+                    >
+                      {t(settings.locale, 'win.removeFromWheel')}
+                    </button>
                   </div>
 
                 </motion.div>
@@ -960,7 +1007,7 @@ function App() {
           >
             <span className={`flex items-center gap-2 ${listCollapsed ? 'lg:hidden' : ''}`}>
               <Gamepad2 className="text-indigo-400" />
-              {t(settings.locale, 'games.title')} ({games.length})
+              {t(settings.locale, 'games.title')} ({visibleGames.length})
             </span>
             {listCollapsed && (
               <ChevronRight size={16} className="hidden lg:block text-slate-500 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
@@ -971,6 +1018,19 @@ function App() {
               <ChevronUp size={20} className="text-slate-400 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:text-indigo-400" />
             )}
           </button>
+          {listCollapsed && (
+            <div className="hidden lg:flex flex-col items-center gap-1 border-t border-slate-700/60 pt-2">
+              <button onClick={handleCopyLink} title={t(settings.locale, 'action.shareWheel')} aria-label={t(settings.locale, 'action.shareWheel')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
+                {linkCopied || linkCopiedFull ? <Check size={16} className="text-emerald-400" /> : <Link2 size={16} />}
+              </button>
+              <button onClick={() => setHistoryOpen(true)} title={t(settings.locale, 'action.history')} aria-label={t(settings.locale, 'action.history')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
+                <HistoryIcon size={16} />
+              </button>
+              <button onClick={() => setSettingsOpen(true)} title={t(settings.locale, 'action.settings')} aria-label={t(settings.locale, 'action.settings')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
+                <SettingsIcon size={16} />
+              </button>
+            </div>
+          )}
           <AnimatePresence initial={false}>
           {!listCollapsed && (
           <motion.div
@@ -985,10 +1045,11 @@ function App() {
             <div>
               <button
                 onClick={handleCopyLink}
-                className={`w-full p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white ${linkCopied ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                disabled={sharing}
+                className={`w-full p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white disabled:opacity-50 ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
               >
-                {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
-                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : t(settings.locale, 'action.shareWheel')}</span>
+                {linkCopied || linkCopiedFull ? <Check size={20} /> : <Link2 size={20} />}
+                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : t(settings.locale, 'action.shareWheel')}</span>
               </button>
               {linkError && (
                 <div className="mt-1 text-xs text-red-400 break-all">
@@ -996,10 +1057,14 @@ function App() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               <button onClick={() => setImportOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.import')}>
                 <ClipboardPaste size={20} />
                 <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.import')}</span>
+              </button>
+              <button onClick={() => setGames(prev => [...prev].sort(() => Math.random() - 0.5))} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.shuffle')}>
+                <Shuffle size={20} />
+                <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.shuffle')}</span>
               </button>
               <button onClick={() => setHistoryOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.history')}>
                 <HistoryIcon size={20} />
@@ -1013,6 +1078,47 @@ function App() {
                 <SettingsIcon size={20} />
                 <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.settings')}</span>
               </button>
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={selectedPreset}
+                onChange={(e) => e.target.value ? loadPreset(e.target.value) : setSelectedPreset('')}
+                aria-label={t(settings.locale, 'presets.label')}
+                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-2 text-slate-300 text-sm min-w-0"
+              >
+                <option value="">{t(settings.locale, 'presets.none')}</option>
+                {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+              </select>
+              {presetSaving ? (
+                <input
+                  autoFocus
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && savePreset()}
+                  onBlur={savePreset}
+                  placeholder={t(settings.locale, 'presets.name')}
+                  className="w-28 bg-slate-700 border border-indigo-500 rounded-lg px-2 py-2 text-white text-sm"
+                />
+              ) : (
+                <button
+                  onClick={() => selectedPreset ? savePreset() : setPresetSaving(true)}
+                  title={t(settings.locale, 'presets.save')}
+                  aria-label={t(settings.locale, 'presets.save')}
+                  className="px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+                >
+                  <Save size={18} />
+                </button>
+              )}
+              {selectedPreset && (
+                <button
+                  onClick={deletePreset}
+                  title={t(settings.locale, 'presets.delete')}
+                  aria-label={t(settings.locale, 'presets.delete')}
+                  className="px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1055,43 +1161,17 @@ function App() {
                 className="flex flex-col bg-slate-700/50 p-3 rounded-lg border border-slate-600"
               >
                 {editingGame?.id === game.id ? (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-slate-400 text-xs">{t(settings.locale, 'games.name')}</label>
-                      <input 
-                        type="text" 
-                        value={editForm.name} 
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
-                        className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-slate-400 text-xs">Steam App ID</label>
-                      <input 
-                        type="text" 
-                        value={editForm.appId} 
-                        onChange={(e) => setEditForm({ ...editForm, appId: e.target.value })} 
-                        className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-slate-400 text-xs">{t(settings.locale, 'games.color')}</label>
-                      <input 
-                        type="color" 
-                        value={editForm.color} 
-                        onChange={(e) => setEditForm({ ...editForm, color: e.target.value })} 
-                        className="w-full h-10 rounded" 
-                      />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={saveEditedGame} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded text-base font-medium">{t(settings.locale, 'action.save')}</button>
-                      <button onClick={() => setEditingGame(null)} className="px-6 bg-slate-600 hover:bg-slate-500 text-white py-3 rounded text-base font-medium">{t(settings.locale, 'action.cancel')}</button>
-                    </div>
-                  </div>
+                  <EditGameForm
+                    loc={settings.locale}
+                    editForm={editForm}
+                    setEditForm={setEditForm}
+                    onSave={saveEditedGame}
+                    onCancel={() => setEditingGame(null)}
+                  />
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 overflow-hidden">
+                      <div className={`flex items-center gap-3 overflow-hidden ${game.hidden ? 'opacity-40' : ''}`}>
                         <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: game.color }} />
                         <div className="overflow-hidden">
                           <span className="truncate text-sm font-medium block" title={game.name}>{game.name}</span>
@@ -1101,6 +1181,14 @@ function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setGames(prev => prev.map(g => g.id === game.id ? { ...g, hidden: !g.hidden } : g))}
+                          title={t(settings.locale, game.hidden ? 'games.showOnWheel' : 'games.hideFromWheel')}
+                          aria-label={t(settings.locale, game.hidden ? 'games.showOnWheel' : 'games.hideFromWheel')}
+                          className={`p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center ${game.hidden ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          {game.hidden ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                         {settings.steam.enableIntegration && (
                           <button
                             onClick={() => handleToggleSuggestions(game)}
@@ -1112,12 +1200,16 @@ function App() {
                         )}
                         <button
                           onClick={() => handleEditGame(game)}
+                          title={t(settings.locale, 'games.edit')}
+                          aria-label={t(settings.locale, 'games.edit')}
                           className="text-slate-400 hover:text-indigo-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <Edit2 size={18} />
                         </button>
                         <button
                           onClick={() => handleRemoveGame(game.id)}
+                          title={t(settings.locale, 'games.remove')}
+                          aria-label={t(settings.locale, 'games.remove')}
                           className="text-slate-400 hover:text-red-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <X size={18} />
@@ -1226,8 +1318,6 @@ function App() {
       </div>
 
       <SettingsPanel
-        games={games}
-        setGames={setGames}
         settings={settings}
         setSettings={setSettings}
         isOpen={settingsOpen}
@@ -1238,12 +1328,6 @@ function App() {
         preloading={preloading}
         preloadProgress={preloadProgress}
         handlePreloadPrices={handlePreloadPrices}
-        editingGame={editingGame}
-        setEditingGame={setEditingGame}
-        editForm={editForm}
-        setEditForm={setEditForm}
-        saveEditedGame={saveEditedGame}
-        handleEditGame={handleEditGame}
       />
 
       <HistoryPanel
@@ -1298,6 +1382,30 @@ function App() {
                   <X size={24} />
                 </button>
               </div>
+              {settings.steam.enableIntegration && (
+                <div className="mb-4 space-y-2">
+                  <label className="text-slate-300 text-sm font-semibold">{t(settings.locale, 'import.steamLibrary')}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={steamIdInput}
+                      onChange={(e) => setSteamIdInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleImportLibrary()}
+                      placeholder={t(settings.locale, 'import.steamIdPh')}
+                      className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm"
+                    />
+                    <button
+                      onClick={handleImportLibrary}
+                      disabled={steamImportLoading || !steamIdInput.trim()}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      {steamImportLoading ? '...' : t(settings.locale, 'import.libraryBtn')}
+                    </button>
+                  </div>
+                  {steamImportError && <p className="text-xs text-red-400">{steamImportError}</p>}
+                  <p className="text-xs text-slate-500">{t(settings.locale, 'import.steamHint')}</p>
+                </div>
+              )}
               <p className="text-slate-400 mb-4">{t(settings.locale, 'import.hint')}</p>
               <textarea
                 value={importText}

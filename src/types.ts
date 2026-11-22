@@ -7,6 +7,7 @@ export interface Game {
   originalPrice?: string;
   color: string;
   image?: string;
+  hidden?: boolean;
 }
 
 export interface HistoryItem {
@@ -35,7 +36,7 @@ export interface Settings {
     region: string;
     currency: string;
     enableIntegration: boolean;
-    useProxy: boolean;
+
   };
   wheel: {
     spinDuration: number;
@@ -54,7 +55,7 @@ export interface Settings {
   prices: {
     showPrices: boolean;
     showDiscounts: boolean;
-    preloaded: boolean;
+
   };
   spinButton: {
     text: string;
@@ -88,7 +89,6 @@ export const DEFAULT_SETTINGS: Settings = {
     region: defaultLocale === 'ru' ? 'kz' : 'us',
     currency: defaultLocale === 'ru' ? 'KZT' : 'USD',
     enableIntegration: true,
-    useProxy: true
   },
   wheel: {
     spinDuration: 7,
@@ -107,7 +107,6 @@ export const DEFAULT_SETTINGS: Settings = {
   prices: {
     showPrices: true,
     showDiscounts: true,
-    preloaded: false
   },
   spinButton: {
     text: 'SPIN',

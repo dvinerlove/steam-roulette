@@ -238,6 +238,43 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Steam library import: GET /api/library/<steamId64|vanity>
+    if (req.method === "GET" && (pathname.startsWith("/api/library/") || pathname.startsWith("/library/"))) {
+      const steamIdParam = decodeURIComponent(pathname.split("/").pop() || "").trim();
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const apiKey = Deno.env.get("STEAM_API_KEY");
+      if (!apiKey) {
+        return json({ error: "STEAM_API_KEY not configured on the server" }, 501);
+      }
+      if (!steamIdParam) {
+        return json({ error: "Missing Steam ID" }, 400);
+      }
+      try {
+        let steamId64 = steamIdParam;
+        // Support vanity/profile names as well as raw SteamID64
+        if (!/^\d{17}$/.test(steamIdParam)) {
+          const r = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${apiKey}&vanityurl=${encodeURIComponent(steamIdParam)}`);
+          const j = await r.json();
+          if (j?.response?.success !== 1) {
+            return json({ error: "Steam profile not found" }, 404);
+          }
+          steamId64 = j.response.steamid;
+        }
+        const r = await fetch(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId64}&include_appinfo=1&format=json`);
+        const j = await r.json();
+        const games = (j?.response?.games || [])
+          .filter((g: any) => g?.name)
+          .map((g: any) => ({ appId: String(g.appid), name: String(g.name) }));
+        if (games.length === 0) {
+          return json({ error: "Library is empty or profile is private" }, 404);
+        }
+        return json({ games });
+      } catch (e) {
+        return json({ error: e instanceof Error ? e.message : "Steam request failed" }, 502);
+      }
+    }
+
     // Get game mapping
     if (req.method === "GET" && (pathname === "/api/mappings" || pathname === "/mappings")) {
       const url = new URL(req.url);
