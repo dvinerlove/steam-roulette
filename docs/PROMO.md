@@ -85,6 +85,8 @@ Post Tue–Thu, ~14:00 UTC.
 
 ### Habr (article — main RU channel)
 
+**Full draft ready**: `docs/habr-article.md` — copy-paste into Habr editor, tags included.
+
 **Title:** Steam-рулетка: как я сделал колесо, которое выбирает, во что играть
 
 **Structure (draft below):**
