@@ -389,12 +389,11 @@ Deno.serve(async (req) => {
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "3600" } }
         );
       }
-      // lazy janitor: ~2% of share writes drop stale rows so tables don't grow forever
+      // lazy janitor: ~2% of share writes drop stale rate_limits rows.
+      // shares themselves stay forever — links may be reused months later.
       if (Math.random() < 0.02) {
         supabase.from("rate_limits").delete().lt("window_start", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
           .then(() => {}, (e) => console.error("rate_limits cleanup:", e));
-        supabase.from("shares").delete().lt("created_at", new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString())
-          .then(() => {}, (e) => console.error("shares cleanup:", e));
       }
       try {
         const body = await req.json();
