@@ -389,6 +389,13 @@ Deno.serve(async (req) => {
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "3600" } }
         );
       }
+      // lazy janitor: ~2% of share writes drop stale rows so tables don't grow forever
+      if (Math.random() < 0.02) {
+        supabase.from("rate_limits").delete().lt("window_start", new Date(Date.now() - 24 * 3600 * 1000).toISOString())
+          .then(() => {}, (e) => console.error("rate_limits cleanup:", e));
+        supabase.from("shares").delete().lt("created_at", new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString())
+          .then(() => {}, (e) => console.error("shares cleanup:", e));
+      }
       try {
         const body = await req.json();
         const shareData = body.state || body.data;
@@ -398,6 +405,16 @@ Deno.serve(async (req) => {
             JSON.stringify({ error: "Missing share data (state or data field required)" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
+        }
+
+        // Custom images are base64 data-URLs up to ~1.4MB each — the main share
+        // bloat. Strip them server-side: colors/steam icons survive, DB stays small.
+        if (shareData && Array.isArray(shareData.games)) {
+          for (const g of shareData.games) {
+            if (typeof g?.image === "string" && g.image.startsWith("data:")) {
+              delete g.image;
+            }
+          }
         }
 
         // Generate a hash of the share data
