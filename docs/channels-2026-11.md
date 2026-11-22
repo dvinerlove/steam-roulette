@@ -104,3 +104,10 @@ a real store listing + searchable "random game picker" surface with zero competi
 12. **Fazier** — only if willing to add their badge to the page (small code change); skip otherwise.
 13. **Backloggd + HLTB Discords** — join, mention tool where backlog talk happens. ~10 min each.
 14. Deferred (needs code): PWA manifest+SW → Microsoft Store; Fazier badge.
+
+## Overnight results (2026-11-23)
+
+- GitHub social previews uploaded for both repos (og-image + live screenshot).
+- Google Search Console: `fortune-wheel/` property VERIFIED (HTML file deployed to public/). `f1-timer/` verification file deployed — add property while logged in; it auto-verifies.
+- OpenAlternative: requires 50+ stars + custom domain — rejected, revisit later.
+- PWA shipped: manifest + service worker + icons live on Pages.
