@@ -207,13 +207,23 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-slate-300 text-sm">{t(loc, 'appearance.labelPosition')}</label>
-            <select value={settings.wheel.textPosition} onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textPosition: e.target.value as any } })} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white">
-              <option value="inner">{t(loc, 'appearance.posInner')}</option>
-              <option value="middle">{t(loc, 'appearance.posMiddle')}</option>
-              <option value="outer">{t(loc, 'appearance.posOuter')}</option>
-              <option value="far-outer">{t(loc, 'appearance.posFarOuter')}</option>
-            </select>
+            <div className="flex justify-between items-center">
+              <label className="text-slate-300 text-sm">{t(loc, 'appearance.labelPosition')}</label>
+              <span className="text-slate-400 text-xs">{Math.round(settings.wheel.textPosition * 2)}%</span>
+            </div>
+            <input
+              type="range"
+              min="12"
+              max="46"
+              step="1"
+              value={58 - settings.wheel.textPosition}
+              onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textPosition: 58 - Number(e.target.value) } })}
+              className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
+            />
+            <div className="flex justify-between text-slate-500 text-xs">
+              <span>{t(loc, 'appearance.posFarOuter')}</span>
+              <span>{t(loc, 'appearance.posInner')}</span>
+            </div>
           </div>
 
           <div className="space-y-3 pt-2">

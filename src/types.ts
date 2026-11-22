@@ -43,7 +43,7 @@ export interface Settings {
     showGameNames: boolean;
     showImages: boolean;
     showColors: boolean;
-    textPosition: 'inner' | 'middle' | 'outer' | 'far-outer';
+    textPosition: number; // радиус якоря в единицах viewBox (0..50)
     showSectorLines: boolean;
     idleSpin: boolean;
     textColor: string;
@@ -95,7 +95,7 @@ export const DEFAULT_SETTINGS: Settings = {
     showGameNames: true,
     showImages: true,
     showColors: true,
-    textPosition: 'far-outer',
+    textPosition: 42,
     showSectorLines: true,
     idleSpin: true,
     textColor: '#ffffff',
@@ -123,12 +123,17 @@ export const DEFAULT_SETTINGS: Settings = {
   }
 };
 
+// Легаси-значения позиции подписи из старых сохранений и шар
+const LEGACY_TEXT_POSITIONS: Record<string, number> = { inner: 22, middle: 30, outer: 38, 'far-outer': 42 };
+const normalizeTextPosition = (v?: number | string): number =>
+  typeof v === 'number' ? v : LEGACY_TEXT_POSITIONS[v ?? ''] ?? DEFAULT_SETTINGS.wheel.textPosition;
+
 // Deep-merge a partial settings object (from share links / localStorage) over defaults
 export const mergeSettings = (partial?: Partial<Settings>): Settings => ({
   ...DEFAULT_SETTINGS,
   ...partial,
   customization: { ...DEFAULT_SETTINGS.customization, ...partial?.customization },
-  wheel: { ...DEFAULT_SETTINGS.wheel, ...partial?.wheel },
+  wheel: { ...DEFAULT_SETTINGS.wheel, ...partial?.wheel, textPosition: normalizeTextPosition(partial?.wheel?.textPosition) },
   spinButton: { ...DEFAULT_SETTINGS.spinButton, ...partial?.spinButton },
   sound: { ...DEFAULT_SETTINGS.sound, ...partial?.sound },
   titles: { ...DEFAULT_SETTINGS.titles, ...partial?.titles },

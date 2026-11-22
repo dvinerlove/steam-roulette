@@ -19,18 +19,22 @@ const uid = () => Math.random().toString(36).slice(2, 11);
 const API_URL = import.meta.env.VITE_API_URL;
 
 // Anonymous usage stats: one random visitor id per browser, no PII
+const getVisitorId = () => {
+  let vid = localStorage.getItem('fwVisitorId');
+  if (!vid) {
+    vid = crypto.randomUUID();
+    localStorage.setItem('fwVisitorId', vid);
+  }
+  return vid;
+};
+
 const trackEvent = (event: 'visit' | 'spin' | 'share') => {
   if (!API_URL) return;
   try {
-    let vid = localStorage.getItem('fwVisitorId');
-    if (!vid) {
-      vid = crypto.randomUUID();
-      localStorage.setItem('fwVisitorId', vid);
-    }
     fetch(`${API_URL}/api/track`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event, visitor: vid, ref: document.referrer || null }),
+      body: JSON.stringify({ event, visitor: getVisitorId(), ref: document.referrer || null }),
       keepalive: true
     }).catch(() => {});
   } catch { /* localStorage off — skip tracking */ }
@@ -64,7 +68,13 @@ function App() {
   const [initialized, setInitialized] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopiedFull, setLinkCopiedFull] = useState(false);
+  const [linkUpdated, setLinkUpdated] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [shareMode, setShareMode] = useState<'snapshot' | 'live'>(() =>
+    localStorage.getItem('fwShareMode') === 'live' ? 'live' : 'snapshot');
+  const [liveShareId, setLiveShareId] = useState<string | null>(() =>
+    localStorage.getItem('fwLiveShare'));
+  const [liveDirty, setLiveDirty] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
   const [dbError, setDbError] = useState<string | null>(null);
@@ -129,8 +139,8 @@ function App() {
 
     const state = {
       settings,
-      games: games.map(game => ({ 
-        name: game.name, 
+      games: games.map(game => ({
+        name: game.name,
         appId: game.appId,
         color: game.color,
         image: game.image
@@ -138,34 +148,61 @@ function App() {
     };
     const encodedState = btoa(encodeURIComponent(JSON.stringify(state)));
 
+    const live = shareMode === 'live';
+    const createShare = async (withOwner: boolean): Promise<string> => {
+      const resp = await fetch(`${API_URL}/api/shares`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(withOwner ? { state, owner: getVisitorId() } : { state })
+      });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(e.error || t(settings.locale, 'err.apiStatus', { code: resp.status }));
+      }
+      const { shareId } = await resp.json();
+      if (!shareId) throw new Error(t(settings.locale, 'err.noShareId'));
+      return shareId;
+    };
+
     let shortLinkSuccess = false;
-    // Try to save to DB for short link
+    let updated = false;
     try {
       if (!API_URL) {
         throw new Error(t(settings.locale, 'err.noApiUrl'));
       }
-      const response = await fetch(`${API_URL}/api/shares`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: state }) // Send actual state object, not encoded
-      });
-
-      if (response.ok) {
-        const { shareId } = await response.json();
-        if (!shareId) {
-          throw new Error(t(settings.locale, 'err.noShareId'));
+      let id: string;
+      if (live && liveShareId && !liveDirty) {
+        id = liveShareId; // wheel unchanged — same link is already current
+      } else if (live && liveShareId) {
+        const resp = await fetch(`${API_URL}/api/shares/${liveShareId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state, owner: getVisitorId() })
+        });
+        if (resp.ok) {
+          id = liveShareId;
+          updated = true;
+        } else if (resp.status === 403 || resp.status === 404) {
+          // ownership lost (other browser / wiped storage) — mint a fresh live link
+          id = await createShare(true);
+          setLiveShareId(id);
+          localStorage.setItem('fwLiveShare', id);
+        } else {
+          const e = await resp.json().catch(() => ({}));
+          throw new Error(e.error || t(settings.locale, 'err.apiStatus', { code: resp.status }));
         }
-        url.searchParams.set('share', shareId);
-        url.searchParams.delete('state'); // Remove old state param if exists
-        shortLinkSuccess = true;
+        setLiveDirty(false);
       } else {
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.error || t(settings.locale, 'err.apiStatus', { code: response.status }));
-        } catch {
-          throw new Error(t(settings.locale, 'err.apiStatus', { code: response.status }));
+        id = await createShare(live);
+        if (live) {
+          setLiveShareId(id);
+          localStorage.setItem('fwLiveShare', id);
+          setLiveDirty(false);
         }
       }
+      url.searchParams.set('share', id);
+      url.searchParams.delete('state'); // Remove old state param if exists
+      shortLinkSuccess = true;
     } catch {
       // Короткая ссылка не получилась — fallback на state-параметр, это не ошибка для юзера
       url.searchParams.set('state', encodedState);
@@ -179,7 +216,10 @@ function App() {
       setSharing(false);
       return;
     }
-    if (shortLinkSuccess) {
+    if (updated) {
+      setLinkUpdated(true);
+      setTimeout(() => setLinkUpdated(false), 2000);
+    } else if (shortLinkSuccess) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } else {
@@ -601,6 +641,8 @@ function App() {
     } catch {
       // Quota exceeded (big images) — не роняем приложение
     }
+    // Live share exists and the wheel moved on — offer "Обновить ссылку"
+    if (liveShareId) setLiveDirty(true);
   }, [settings, games, history, initialized]);
 
   // Заголовок вкладки следует за настраиваемым заголовком
@@ -856,14 +898,14 @@ function App() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:flex gap-8 relative z-10">
 
         <div className="lg:flex-1 lg:min-w-0 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
-          <div className="text-center space-y-4">
+          <div className={`text-center space-y-4 transition-transform duration-300 ease-out ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`}>
             <h1 className="text-[clamp(1.5rem,4vw,4.5rem)] font-black leading-[1.15] pb-[0.12em] whitespace-nowrap overflow-hidden text-ellipsis bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
               {settings.titles.main}
             </h1>
             <p className="text-slate-200 font-medium text-sm md:text-xl">{settings.titles.subtitle}</p>
           </div>
 
-          <div className="relative">
+          <div className={`relative transition-transform duration-300 ease-out ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`}>
             <FortuneWheel
               games={visibleGames}
               onResult={handleResult} 
@@ -991,10 +1033,12 @@ function App() {
           </AnimatePresence>
         </div>
 
-        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity] lg:duration-300 lg:ease-out ${
-          listCollapsed
-            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:cursor-pointer group'
-            : 'p-6 lg:w-1/3'
+        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity,padding,margin,border-color] lg:duration-300 lg:ease-out ${
+          settingsOpen
+            ? 'p-6 lg:w-0 lg:p-0 lg:border-transparent lg:opacity-0 lg:-mr-8 lg:pointer-events-none'
+            : listCollapsed
+              ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:cursor-pointer group'
+              : 'p-6 lg:w-1/3'
         }`}>
           <button
             onClick={() => { localStorage.setItem('fortuneWheelListCollapsed', listCollapsed ? '0' : '1'); setListCollapsed(!listCollapsed); }}
@@ -1045,9 +1089,22 @@ function App() {
                 disabled={sharing}
                 className={`w-full p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white disabled:opacity-50 ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
               >
-                {linkCopied || linkCopiedFull ? <Check size={20} /> : <Link2 size={20} />}
-                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : t(settings.locale, 'action.shareWheel')}</span>
+                {linkCopied || linkCopiedFull || linkUpdated ? <Check size={20} /> : <Link2 size={20} />}
+                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : linkUpdated ? t(settings.locale, 'share.updated') : (shareMode === 'live' && liveShareId && liveDirty) ? t(settings.locale, 'share.update') : t(settings.locale, 'action.shareWheel')}</span>
               </button>
+              <label className="mt-2 flex items-start gap-2 text-xs text-slate-400 cursor-pointer select-none" title={t(settings.locale, 'share.liveHint')}>
+                <input
+                  type="checkbox"
+                  checked={shareMode === 'live'}
+                  onChange={(e) => {
+                    const mode = e.target.checked ? 'live' : 'snapshot';
+                    setShareMode(mode);
+                    localStorage.setItem('fwShareMode', mode);
+                  }}
+                  className="mt-0.5 accent-indigo-500"
+                />
+                <span>{t(settings.locale, 'share.modeLive')}<br /><span className="text-slate-500">{t(settings.locale, 'share.liveHint')}</span></span>
+              </label>
               {linkError && (
                 <div className="mt-1 text-xs text-red-400 break-all">
                   {linkError}

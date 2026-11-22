@@ -129,16 +129,17 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
     onResult(games[winningIndex]);
   };
 
-  const getTextRadius = () => {
-    switch (settings.wheel.textPosition) {
-      case 'inner': return 22;
-      case 'middle': return 30;
-      case 'outer': return 38;
-      case 'far-outer': default: return 42;
-    }
-  };
+  const getTextRadius = () => Math.min(Math.max(settings.wheel.textPosition, 12), 46);
 
   const textRadius = getTextRadius();
+
+  // Иконка и подпись лежат на одной радиальной оси слайса. Если подписи внутрь не хватает
+  // разбега до кнопки — ставим её снаружи иконки и пускаем к краю.
+  const imgHalf = Math.min(6, textRadius * Math.sin((sectorAngle * Math.PI) / 360) * 0.9, 49 - textRadius);
+  const labelOutward = settings.wheel.showImages && textRadius - imgHalf - 1.5 < 16;
+  const labelRadius = settings.wheel.showImages
+    ? textRadius + (labelOutward ? imgHalf + 1.5 : -imgHalf - 1.5)
+    : textRadius;
 
   const truncateName = (name: string): string => {
     const truncMult = settings.wheel.textTruncationMultiplier;
@@ -159,7 +160,9 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       count <= 24 ? 4 : count <= 36 ? 3.2 : count <= 50 ? 2.6 : 2.2;
     if (count === 0) return base;
     // текст идёт от края внутрь — ширина строки ограничена радиальной глубиной
-    const radial = Math.max(textRadius - 6, 12);
+    const radial = labelOutward
+      ? Math.max(49 - labelRadius, 8)
+      : Math.max(labelRadius - 9, 4); // 9 = радиус хаба + зазор, чтобы текст не заезжал под кнопку
     const maxLen = Math.max(1, ...games.map(g => truncateName(g.name).length));
     return Math.min(base, radial / (0.62 * maxLen));
   })();
@@ -214,6 +217,8 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
             const textX = 50 + textRadius * Math.cos((sectorMidAngle * Math.PI) / 180);
             const textY = 50 + textRadius * Math.sin((sectorMidAngle * Math.PI) / 180);
+            const labelX = 50 + labelRadius * Math.cos((sectorMidAngle * Math.PI) / 180);
+            const labelY = 50 + labelRadius * Math.sin((sectorMidAngle * Math.PI) / 180);
 
             // Переворачиваем текст на левой половине колеса, чтобы он не был вверх ногами
             const midDeg = ((sectorMidAngle % 360) + 360) % 360;
@@ -236,22 +241,27 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                 {settings.wheel.showImages && (
                   <g transform={`translate(${textX}, ${textY}) rotate(${textRotation})`}>
                     {game.image ? (
-                      <image
-                        href={game.image}
-                        x="-6"
-                        y="-6"
-                        width="12"
-                        height="12"
-                        preserveAspectRatio="xMidYMid slice"
-                        className="select-none pointer-events-none"
-                        style={{ borderRadius: '50%' }}
-                        onError={(e) => { (e.target as SVGImageElement).style.display = 'none'; }}
-                      />
+                      <>
+                        <clipPath id={`wheel-clip-${i}`}>
+                          <circle r={imgHalf} />
+                        </clipPath>
+                        <image
+                          href={game.image}
+                          x={-imgHalf}
+                          y={-imgHalf}
+                          width={imgHalf * 2}
+                          height={imgHalf * 2}
+                          preserveAspectRatio="xMidYMid slice"
+                          clipPath={`url(#wheel-clip-${i})`}
+                          className="select-none pointer-events-none"
+                          onError={(e) => { (e.target as SVGImageElement).style.display = 'none'; }}
+                        />
+                      </>
                     ) : (
                       <circle
                         cx="0"
                         cy="0"
-                        r="6"
+                        r={imgHalf}
                         fill={game.color}
                         opacity="0.8"
                         className="select-none pointer-events-none"
@@ -260,14 +270,14 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                   </g>
                 )}
                 {settings.wheel.showGameNames && (
-                  <g transform={`translate(${textX}, ${textY}) rotate(${textRotation})`}>
+                  <g transform={`translate(${labelX}, ${labelY}) rotate(${textRotation})`}>
                     <text
                       fill={settings.wheel.textColor}
                       fontSize={fontSize}
                       fontWeight="900"
-                      textAnchor={flip ? 'start' : 'end'}
-                      dominantBaseline={settings.wheel.showImages && game.image ? "hanging" : "middle"}
-                      y={settings.wheel.showImages && game.image ? "7" : "0"}
+                      textAnchor={(flip !== labelOutward) ? 'start' : 'end'}
+                      dominantBaseline="middle"
+                      y="0"
                       className="select-none pointer-events-none"
                       style={{ 
                         paintOrder: 'stroke',

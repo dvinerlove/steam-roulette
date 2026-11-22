@@ -13,6 +13,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 // Per-IP rate limit backed by the rate_limits table.
 // Returns true if the request is allowed, false if over the limit.
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function checkRateLimit(ip: string, bucket: string, limit: number, windowSec: number): Promise<boolean> {
   const key = `${bucket}:${ip}`;
   const now = Date.now();
@@ -481,34 +486,39 @@ Deno.serve(async (req) => {
             { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const encoder = new TextEncoder();
-        const data = encoder.encode(shareDataString);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const hashHex = await sha256Hex(shareDataString);
 
-        // Check if a share with this hash already exists
-        const { data: existingShare, error: findError } = await supabase
-          .from("shares")
-          .select("id")
-          .eq("hash", hashHex)
-          .maybeSingle();
+        // Editable ("live") share when the client proves ownership — secret is
+        // stored only as sha256. Live shares never dedup: identical payloads
+        // must stay separate rows or updating one would hijack the other.
+        const ownerSecret = typeof body.owner === "string" && body.owner.length >= 8 ? body.owner : null;
+        const ownerHash = ownerSecret ? await sha256Hex(ownerSecret) : null;
 
-        if (findError) {
-          console.error("Error finding existing share:", findError);
-          throw findError;
-        }
+        if (!ownerHash) {
+          // Check if a snapshot share with this hash already exists
+          const { data: existingShare, error: findError } = await supabase
+            .from("shares")
+            .select("id")
+            .eq("hash", hashHex)
+            .is("owner_hash", null)
+            .maybeSingle();
 
-        if (existingShare) {
-          return new Response(
-            JSON.stringify({ shareId: existingShare.id }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          if (findError) {
+            console.error("Error finding existing share:", findError);
+            throw findError;
+          }
+
+          if (existingShare) {
+            return new Response(
+              JSON.stringify({ shareId: existingShare.id }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
 
         // If not, create a new one
         const id = Math.random().toString(36).substring(2, 8);
-        const { error } = await supabase.from("shares").insert({ id, data: shareData, hash: hashHex });
+        const { error } = await supabase.from("shares").insert({ id, data: shareData, hash: hashHex, owner_hash: ownerHash });
         
         if (error) {
           console.error("Error inserting share:", error);
@@ -523,6 +533,69 @@ Deno.serve(async (req) => {
         console.error("Create share error:", error);
         return new Response(
           JSON.stringify({ error: error.message || "Failed to create share" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Update an editable ("live") share — same id, new payload.
+    // Only shares created with an owner secret are writable; snapshots are immutable forever.
+    if (req.method === "PUT" && (pathname.startsWith("/shares/") || pathname.startsWith("/api/shares/"))) {
+      const id = pathname.split("/").pop() || "";
+      if (!await checkRateLimit(clientIp(req), "share_update", 60, 3600)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const body = await req.json();
+        const shareData = body.state || body.data;
+        const ownerSecret = typeof body.owner === "string" ? body.owner : "";
+        if (!shareData || !ownerSecret) {
+          return new Response(
+            JSON.stringify({ error: "Missing state or owner" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const shareDataString = JSON.stringify(shareData);
+        if (shareDataString.length > 5_000_000) {
+          return new Response(
+            JSON.stringify({ error: "Share payload too large" }),
+            { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const { data: row, error: selErr } = await supabase
+          .from("shares")
+          .select("owner_hash")
+          .eq("id", id)
+          .maybeSingle();
+        if (selErr) throw selErr;
+        if (!row) {
+          return new Response(
+            JSON.stringify({ error: "Share not found" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (!row.owner_hash || row.owner_hash !== await sha256Hex(ownerSecret)) {
+          return new Response(
+            JSON.stringify({ error: "Not allowed" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const { error: updErr } = await supabase
+          .from("shares")
+          .update({ data: shareData, hash: await sha256Hex(shareDataString), updated_at: new Date().toISOString() })
+          .eq("id", id);
+        if (updErr) throw updErr;
+        return new Response(
+          JSON.stringify({ ok: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error: any) {
+        console.error("Update share error:", error);
+        return new Response(
+          JSON.stringify({ error: error.message || "Failed to update share" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
