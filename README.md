@@ -1,7 +1,7 @@
-# 🎡 Fortune Wheel
+# 🎡 Steam Roulette
 
-[![Demo](https://img.shields.io/badge/demo-live-6366f1)](https://dvinerlove.github.io/fortune-wheel/)
-[![Landing](https://img.shields.io/badge/landing-promo-f472b6)](https://dvinerlove.github.io/fortune-wheel/landing.html)
+[![Demo](https://img.shields.io/badge/demo-live-6366f1)](https://dvinerlove.github.io/steam-roulette/)
+[![Landing](https://img.shields.io/badge/landing-promo-f472b6)](https://dvinerlove.github.io/steam-roulette/landing.html)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![React](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -9,9 +9,9 @@
 
 A web app that picks a random game from your list — spin the wheel and let it decide what to play. Steam prices and discounts are fetched automatically, the look is fully customizable, and the whole state fits into one short shareable link. Available in **English** and **Russian** (auto-detected from your browser).
 
-**[▶ Open the app](https://dvinerlove.github.io/fortune-wheel/)** · **[Promo page](https://dvinerlove.github.io/fortune-wheel/landing.html)**
+**[▶ Open the app](https://dvinerlove.github.io/steam-roulette/)** · **[Promo page](https://dvinerlove.github.io/steam-roulette/landing.html)**
 
-![Fortune Wheel — screenshot](docs/screenshot.png)
+![Steam Roulette — screenshot](docs/screenshot.png)
 
 ## Features
 
@@ -33,7 +33,7 @@ A web app that picks a random game from your list — spin the wheel and let it 
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173/fortune-wheel/
+npm run dev        # http://localhost:5173/steam-roulette/
 ```
 
 Steam prices and short links need `VITE_API_URL` — see [.env.example](.env.example) (Supabase Edge Function in `supabase/functions/fortune-wheel`).

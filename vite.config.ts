@@ -8,7 +8,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173
   },
-  base: '/fortune-wheel/', // Change this to your repo name
+  base: '/steam-roulette/', // Change this to your repo name
   build: {
     outDir: 'dist'
   }

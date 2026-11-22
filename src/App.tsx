@@ -605,7 +605,7 @@ function App() {
 
   // Заголовок вкладки следует за настраиваемым заголовком
   useEffect(() => {
-    document.title = settings.titles.main || 'Fortune Wheel';
+    document.title = settings.titles.main || 'Steam Roulette';
     document.documentElement.lang = settings.locale;
   }, [settings.titles.main, settings.locale]);
 
