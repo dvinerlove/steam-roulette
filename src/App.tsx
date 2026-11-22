@@ -956,7 +956,7 @@ function App() {
             onClick={() => { localStorage.setItem('fortuneWheelListCollapsed', listCollapsed ? '0' : '1'); setListCollapsed(!listCollapsed); }}
             aria-expanded={!listCollapsed}
             title={t(settings.locale, listCollapsed ? 'games.expandList' : 'games.collapseList')}
-            className={`w-full flex items-center justify-between text-xl font-bold py-1 ${listCollapsed ? 'lg:justify-center' : ''}`}
+            className={`group w-full flex items-center justify-between text-xl font-bold py-1 -mx-2 px-2 rounded-lg transition-colors duration-200 hover:bg-slate-700/40 ${listCollapsed ? 'lg:justify-center' : ''}`}
           >
             <span className={`flex items-center gap-2 ${listCollapsed ? 'lg:hidden' : ''}`}>
               <Gamepad2 className="text-indigo-400" />
@@ -972,7 +972,7 @@ function App() {
             {listCollapsed ? (
               <ChevronDown size={20} className="text-slate-400 lg:hidden" />
             ) : (
-              <ChevronUp size={20} className="text-slate-400" />
+              <ChevronUp size={20} className="text-slate-400 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:text-indigo-400" />
             )}
           </button>
           <AnimatePresence initial={false}>
