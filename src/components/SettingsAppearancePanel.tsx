@@ -241,26 +241,6 @@ const SettingsAppearancePanel: React.FC<SettingsAppearancePanelProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2 pt-3">
-            <div className="flex justify-between items-center">
-              <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.labelLength')}</label>
-              <span className="text-slate-400 text-xs">{Math.round(settings.wheel.textTruncationMultiplier * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="20"
-              step="0.5"
-              value={settings.wheel.textTruncationMultiplier}
-              onChange={(e) => setSettings({ ...settings, wheel: { ...settings.wheel, textTruncationMultiplier: Number(e.target.value) } })}
-              className="w-full accent-indigo-500 h-8 py-2 bg-transparent appearance-none cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-slate-700 [&::-webkit-slider-runnable-track]:rounded-lg [&::-moz-range-track]:h-2 [&::-moz-range-track]:bg-slate-700 [&::-moz-range-track]:rounded-lg"
-            />
-            <div className="flex justify-between text-slate-500 text-xs">
-              <span>{t(loc, 'appearance.shorter')}</span>
-              <span>{t(loc, 'appearance.noTrunc')}</span>
-            </div>
-          </div>
-
           <div className="space-y-4 pt-4 border-t border-slate-700">
             <label className="text-slate-300 text-sm font-semibold">{t(loc, 'appearance.pageTitles')}</label>
             <div className="space-y-2">

@@ -140,18 +140,8 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
 
   const textRadius = getTextRadius();
 
-  const truncateName = (name: string): string => {
-    const truncMult = settings.wheel.textTruncationMultiplier;
-    if (truncMult >= 10) return name;
-    const count = games.length;
-    const baseLen =
-      count <= 4 ? 22 : count <= 8 ? 18 : count <= 16 ? 14 :
-      count <= 24 ? 10 : count <= 36 ? 8 : count <= 50 ? 6 : 5;
-    const maxLen = Math.round(baseLen * truncMult);
-    return name.length > maxLen ? `${name.substring(0, Math.max(3, maxLen - 3))}...` : name;
-  };
-
   // Шрифт: базовый размер по числу секторов, ужимаем чтобы имя влезало в дугу сектора
+  const radial = Math.max(textRadius - 6, 12);
   const fontSize = (() => {
     const count = games.length;
     const base =
@@ -159,8 +149,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
       count <= 24 ? 4 : count <= 36 ? 3.2 : count <= 50 ? 2.6 : 2.2;
     if (count === 0) return base;
     // текст идёт от края внутрь — ширина строки ограничена радиальной глубиной
-    const radial = Math.max(textRadius - 6, 12);
-    const maxLen = Math.max(1, ...games.map(g => truncateName(g.name).length));
+    const maxLen = Math.max(1, ...games.map(g => Math.min(g.name.length, 24)));
     return Math.min(base, radial / (0.62 * maxLen));
   })();
 
@@ -220,7 +209,9 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
             const flip = midDeg > 90 && midDeg < 270;
             const textRotation = flip ? sectorMidAngle + 180 : sectorMidAngle;
 
-            const displayName = truncateName(game.name);
+            const displayName = game.name;
+            // Длинные имена сжимаем textLength'ом чтобы влезали в одну строку без "..."
+            const textLength = 0.62 * fontSize * displayName.length > radial ? radial : undefined;
 
             return (
               <g key={game.id}>
@@ -266,6 +257,8 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                       fontSize={fontSize}
                       fontWeight="900"
                       textAnchor={flip ? 'start' : 'end'}
+                      textLength={textLength}
+                      lengthAdjust="spacingAndGlyphs"
                       dominantBaseline={settings.wheel.showImages && game.image ? "hanging" : "middle"}
                       y={settings.wheel.showImages && game.image ? "7" : "0"}
                       className="select-none pointer-events-none"

@@ -48,7 +48,6 @@ export interface Settings {
     textColor: string;
     textStrokeColor: string;
     textStrokeWidth: number;
-    textTruncationMultiplier: number;
     confetti: boolean;
   };
   prices: {
@@ -101,7 +100,6 @@ export const DEFAULT_SETTINGS: Settings = {
     textColor: '#ffffff',
     textStrokeColor: '#000000',
     textStrokeWidth: 0.1,
-    textTruncationMultiplier: 2.0,
     confetti: true
   },
   prices: {
