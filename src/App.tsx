@@ -29,9 +29,6 @@ function App() {
   const [listCollapsed, setListCollapsed] = useState(() => localStorage.getItem('fortuneWheelListCollapsed') === '1');
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
-  const [steamIdInput, setSteamIdInput] = useState('');
-  const [steamImportLoading, setSteamImportLoading] = useState(false);
-  const [steamImportError, setSteamImportError] = useState<string | null>(null);
   const [confirmClearGamesOpen, setConfirmClearGamesOpen] = useState(false);
   const [steamSearchResults, setSteamSearchResults] = useState<SteamSearchResult[]>([]);
   const [showSteamSearchResultsModal, setShowSteamSearchResultsModal] = useState(false);
@@ -750,32 +747,6 @@ function App() {
     setSelectedPreset('');
   };
 
-  const handleImportLibrary = async () => {
-    const id = steamIdInput.trim();
-    if (!id || !API_URL) return;
-    setSteamImportLoading(true);
-    setSteamImportError(null);
-    try {
-      // Достаём vanity/id если вставили ссылку на профиль
-      const m = id.match(/steamcommunity\.com\/(?:id|profiles)\/([^/?#]+)/);
-      const sid = m ? m[1] : id;
-      const res = await fetch(`${API_URL}/api/library/${encodeURIComponent(sid)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      const existing = new Set(games.map(g => g.name.toLowerCase()));
-      const newGames: Game[] = (data.games as { name: string; appId: string }[])
-        .filter(g => !existing.has(g.name.toLowerCase()))
-        .map((g, i) => ({ id: uid(), name: g.name, appId: g.appId, color: getGameColor(games.length + i) }));
-      setGames(prev => [...prev, ...newGames]);
-      setImportOpen(false);
-      setSteamIdInput('');
-    } catch (e) {
-      setSteamImportError(e instanceof Error ? e.message : t(settings.locale, 'err.shareFailed'));
-    } finally {
-      setSteamImportLoading(false);
-    }
-  };
-
   const handleRemoveGame = (id: string) => {
     setGames(prev => prev.filter(g => g.id !== id));
   };
@@ -1387,30 +1358,6 @@ function App() {
                   <X size={24} />
                 </button>
               </div>
-              {settings.steam.enableIntegration && (
-                <div className="mb-4 space-y-2">
-                  <label className="text-slate-300 text-sm font-semibold">{t(settings.locale, 'import.steamLibrary')}</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={steamIdInput}
-                      onChange={(e) => setSteamIdInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleImportLibrary()}
-                      placeholder={t(settings.locale, 'import.steamIdPh')}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm"
-                    />
-                    <button
-                      onClick={handleImportLibrary}
-                      disabled={steamImportLoading || !steamIdInput.trim()}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
-                    >
-                      {steamImportLoading ? '...' : t(settings.locale, 'import.libraryBtn')}
-                    </button>
-                  </div>
-                  {steamImportError && <p className="text-xs text-red-400">{steamImportError}</p>}
-                  <p className="text-xs text-slate-500">{t(settings.locale, 'import.steamHint')}</p>
-                </div>
-              )}
               <p className="text-slate-400 mb-4">{t(settings.locale, 'import.hint')}</p>
               <textarea
                 value={importText}
