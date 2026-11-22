@@ -815,9 +815,9 @@ function App() {
         backgroundAttachment: 'fixed'
       }}
     >
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
-        
-        <div className={`${listCollapsed ? 'lg:col-span-3' : 'lg:col-span-2'} flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2`}>
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:flex gap-8 relative z-10">
+
+        <div className="lg:flex-1 lg:min-w-0 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
           <div className="text-center space-y-4">
             <h1 className="text-2xl md:text-5xl lg:text-7xl font-black leading-[1.15] pb-[0.12em] bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
               {settings.titles.main}
@@ -947,22 +947,28 @@ function App() {
           </AnimatePresence>
         </div>
 
-        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 ${
+        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity] lg:duration-300 lg:ease-out ${
           listCollapsed
-            ? 'lg:col-span-1 lg:absolute lg:left-0 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 lg:rounded-r-2xl lg:rounded-l-none lg:border-y lg:border-r lg:border-l-0 lg:p-0 lg:w-7 lg:h-28 lg:opacity-25 lg:hover:opacity-90 lg:transition-opacity lg:duration-200 p-3'
-            : 'lg:col-span-1 p-6'
+            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100'
+            : 'p-6 lg:w-1/3'
         }`}>
           <button
-            onClick={() => setListCollapsed(c => { localStorage.setItem('fortuneWheelListCollapsed', c ? '0' : '1'); return !c; })}
+            onClick={() => { localStorage.setItem('fortuneWheelListCollapsed', listCollapsed ? '0' : '1'); setListCollapsed(!listCollapsed); }}
             aria-expanded={!listCollapsed}
             title={t(settings.locale, listCollapsed ? 'games.expandList' : 'games.collapseList')}
-            className={`w-full flex items-center justify-between text-xl font-bold py-1 ${listCollapsed ? 'lg:h-full lg:justify-center' : ''}`}
+            className={`w-full flex items-center justify-between text-xl font-bold py-1 ${listCollapsed ? 'lg:justify-center' : ''}`}
           >
             <span className={`flex items-center gap-2 ${listCollapsed ? 'lg:hidden' : ''}`}>
               <Gamepad2 className="text-indigo-400" />
               {t(settings.locale, 'games.title')} ({games.length})
             </span>
-            <ChevronRight size={18} className={`text-slate-300 ${listCollapsed ? 'hidden lg:block' : 'hidden'}`} />
+            {listCollapsed && (
+              <span className="hidden lg:flex flex-col items-center gap-1.5 py-1">
+                <Gamepad2 size={18} className="text-indigo-400" />
+                <span className="text-[11px] leading-none text-slate-400">{games.length}</span>
+                <ChevronRight size={14} className="text-slate-500 mt-0.5" />
+              </span>
+            )}
             {listCollapsed ? (
               <ChevronDown size={20} className="text-slate-400 lg:hidden" />
             ) : (
