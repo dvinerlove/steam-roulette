@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Steam Roulette — pick a random game from your list | Fortune Wheel</title>
+  <meta name="description" content="Steam Roulette by Fortune Wheel: can't decide what to play? Add your games, spin the wheel, get a random pick with live Steam prices and discounts. Free, no sign-up." />
+  <link rel="canonical" href="https://dvinerlove.github.io/fortune-wheel/steam-roulette.html" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Steam Roulette — pick a random game from your list" />
+  <meta property="og:description" content="Can't decide what to play? Spin a wheel of your games with live Steam prices. Free, no sign-up." />
+  <meta property="og:url" content="https://dvinerlove.github.io/fortune-wheel/steam-roulette.html" />
+  <meta property="og:image" content="https://dvinerlove.github.io/fortune-wheel/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "What is Steam Roulette?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Steam Roulette is a way to pick a random game when you can't decide what to play — like a roulette wheel over your game list. Fortune Wheel is a free Steam roulette: you add the games, it spins and picks one fairly." } },
+      { "@type": "Question", "name": "Is Fortune Wheel's Steam Roulette free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes — completely free, no sign-up, no ads. Open source under the MIT license." } },
+      { "@type": "Question", "name": "How is this different from wheelofnames and other spinners?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Generic wheels just pick a name. Fortune Wheel is built for games: it auto-matches your entries to Steam, shows live regional prices and discounts on every sector, pulls game covers, and supports presets, hiding games and elimination mode." } },
+      { "@type": "Question", "name": "Can I share my Steam roulette with friends?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes — one short link saves your game list and all settings. Friends open it and spin the same wheel." } }
+    ]
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 24px 0; }
+    .logo { font-weight: 800; font-size: 20px; }
+    .logo span { color: #818cf8; }
+    nav a { color: #94a3b8; text-decoration: none; margin-left: 24px; font-size: 15px; }
+    nav a:hover { color: #fff; }
+    h1 { font-size: clamp(32px, 6vw, 56px); font-weight: 900; line-height: 1.15; margin: 48px 0 20px;
+         background: linear-gradient(90deg, #818cf8, #c084fc, #f472b6);
+         -webkit-background-clip: text; background-clip: text; color: transparent; }
+    h2 { font-size: 24px; font-weight: 800; margin: 40px 0 14px; }
+    p, li { color: #cbd5e1; font-size: 17px; line-height: 1.7; }
+    ul { padding-left: 24px; margin: 12px 0; }
+    .cta {
+      display: inline-block; margin: 28px 0; padding: 16px 42px;
+      background: #4f46e5; color: #fff; font-size: 19px; font-weight: 700;
+      border-radius: 14px; text-decoration: none;
+      transition: background .15s, transform .15s;
+    }
+    .cta:hover { background: #6366f1; transform: translateY(-2px); }
+    .card {
+      background: rgba(30, 41, 59, .7); border: 1px solid #334155;
+      border-radius: 14px; padding: 20px 24px; margin: 14px 0;
+    }
+    .card h3 { font-size: 16px; margin-bottom: 6px; }
+    .card p { color: #94a3b8; font-size: 14.5px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #334155; font-size: 15px; }
+    th { color: #94a3b8; font-weight: 600; }
+    footer { border-top: 1px solid #1e293b; padding: 32px 0; margin-top: 56px; text-align: center; color: #64748b; font-size: 14px; }
+    footer a { color: #818cf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <div class="logo">Fortune<span>Wheel</span></div>
+      <div>
+        <a href="landing-ru.html">RU</a>
+        <a href="./">Open app</a>
+        <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">GitHub</a>
+      </div>
+    </nav>
+
+    <h1>Steam Roulette</h1>
+    <p>
+      You know the feeling: 200 games in the backlog, 40 minutes spent scrolling,
+      and you end up playing nothing. <strong>Steam Roulette</strong> fixes that —
+      put your games on a wheel, spin it, and play whatever wins. No debating.
+    </p>
+    <a class="cta" href="./">Spin the wheel →</a>
+
+    <h2>What is Steam Roulette?</h2>
+    <p>
+      Steam Roulette is a game-picking ritual: instead of choosing yourself,
+      you let chance decide. The name comes from Funhaus' old YouTube show —
+      but their wheel picked from the whole Steam catalog. Ours spins over
+      <strong>your</strong> list: your backlog, your co-op night options,
+      your "games I keep meaning to finish".
+    </p>
+
+    <h2>Why Fortune Wheel?</h2>
+    <ul>
+      <li><strong>Built for games</strong> — every entry auto-matches to Steam: live prices, discounts and covers on the wheel itself.</li>
+      <li><strong>Fair pick</strong> — cryptographic RNG (<code>crypto.getRandomValues</code>), every game has an equal 1/N chance.</li>
+      <li><strong>Share it</strong> — one short link carries your whole wheel. Send it to your co-op group and let it pick tonight's game.</li>
+      <li><strong>Presets & elimination</strong> — multiple saved lists, hide games you're not in the mood for, remove winners until the list is done.</li>
+      <li><strong>No sign-up</strong> — everything stays in your browser. Free and open source (MIT).</li>
+    </ul>
+
+    <h2>vs generic wheel spinners</h2>
+    <table>
+      <tr><th></th><th>Fortune Wheel</th><th>Generic spinners</th></tr>
+      <tr><td>Live Steam prices & discounts</td><td>Yes</td><td>No</td></tr>
+      <tr><td>Game covers on sectors</td><td>Yes</td><td>Sometimes</td></tr>
+      <tr><td>Shareable wheel links</td><td>Yes</td><td>Sometimes</td></tr>
+      <tr><td>Elimination mode</td><td>Yes</td><td>Some</td></tr>
+      <tr><td>Weighted / rigged odds</td><td>No — always fair</td><td>Some</td></tr>
+      <tr><td>Sign-up required</td><td>Never</td><td>Some</td></tr>
+    </table>
+
+    <h2>How it works</h2>
+    <p>1. Add games — one by one, pasted in bulk, or auto-linked to Steam.<br>
+       2. Spin — the wheel decelerates with a soft tick and picks your game.<br>
+       3. Play — or hit "Remove winner" and let it burn through the backlog.</p>
+    <a class="cta" href="./">Try it free →</a>
+
+    <h2>FAQ</h2>
+    <div class="card"><h3>Is Steam Roulette free?</h3><p>Yes — completely free, no sign-up, no ads. Open source (MIT).</p></div>
+    <div class="card"><h3>How is it different from wheelofnames?</h3><p>Generic wheels just pick a name. Fortune Wheel is built for games: Steam prices, discounts and covers on every sector, presets and elimination mode.</p></div>
+    <div class="card"><h3>Can I share my wheel?</h3><p>Yes — one short link saves your list and settings; friends open it and spin the same wheel.</p></div>
+    <div class="card"><h3>Does it read my Steam library?</h3><p>Not yet — you add games yourself (bulk paste works). Library import is on the roadmap.</p></div>
+    <div class="card"><h3>Is it really random?</h3><p>Yes — crypto.getRandomValues, equal sector for every game. No weighting, no tricks.</p></div>
+
+    <footer>
+      Made with ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Source on GitHub</a> · <a href="landing.html">English landing</a> · <a href="landing-ru.html">Русская версия</a>
+    </footer>
+  </div>
+</body>
+</html>
