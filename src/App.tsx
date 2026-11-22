@@ -949,7 +949,7 @@ function App() {
 
         <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity] lg:duration-300 lg:ease-out ${
           listCollapsed
-            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100'
+            ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:hover:shadow-[0_0_24px_rgba(99,102,241,0.35)] lg:cursor-pointer group'
             : 'p-6 lg:w-1/3'
         }`}>
           <button
@@ -964,9 +964,9 @@ function App() {
             </span>
             {listCollapsed && (
               <span className="hidden lg:flex flex-col items-center gap-1.5 py-1">
-                <Gamepad2 size={18} className="text-indigo-400" />
-                <span className="text-[11px] leading-none text-slate-400">{games.length}</span>
-                <ChevronRight size={14} className="text-slate-500 mt-0.5" />
+                <Gamepad2 size={18} className="text-indigo-400 transition-transform duration-200 group-hover:scale-110" />
+                <span className="text-[11px] leading-none text-slate-400 transition-colors duration-200 group-hover:text-slate-200">{games.length}</span>
+                <ChevronRight size={14} className="text-slate-500 mt-0.5 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
               </span>
             )}
             {listCollapsed ? (
