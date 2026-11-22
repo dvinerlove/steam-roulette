@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Game, Settings, HistoryItem } from './types';
-import { getGameColor } from './constants';
+import { getGameColor, DEFAULT_GAMES } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
 import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, type MappingSuggestion } from './utils/steam';
 import type { SteamSearchResult } from './utils/steam';
@@ -482,7 +482,12 @@ function App() {
         const savedGames = loadJson('fortuneWheelGames');
         const savedHistory = loadJson('fortuneWheelHistory');
         if (savedSettings) loadedSettings = mergeSettings(savedSettings);
-        if (Array.isArray(savedGames)) loadedGames = savedGames.map(normalizeGame);
+        if (localStorage.getItem('fortuneWheelGames') === null) {
+          // Совсем первый визит — подсев демо-игр, чтобы колесо не было пустым
+          loadedGames = DEFAULT_GAMES.map((g, i) => ({ id: uid(), ...g, color: getGameColor(i) }));
+        } else if (Array.isArray(savedGames)) {
+          loadedGames = savedGames.map(normalizeGame);
+        }
         if (Array.isArray(savedHistory)) {
           loadedHistory = savedHistory.map((item: any) =>
             item?.game ? { ...item, game: normalizeGame(item.game) } : item).filter(Boolean);
