@@ -268,6 +268,12 @@ Deno.serve(async (req) => {
 
     // Steam library import: GET /api/library/<steamId64|vanity>
     if (req.method === "GET" && (pathname.startsWith("/api/library/") || pathname.startsWith("/library/"))) {
+      if (!await checkRateLimit(clientIp(req), "library", 10, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+        );
+      }
       const steamIdParam = decodeURIComponent(pathname.split("/").pop() || "").trim();
       const json = (body: unknown, status = 200) =>
         new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
