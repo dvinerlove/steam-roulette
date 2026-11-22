@@ -472,6 +472,11 @@ Deno.serve(async (req) => {
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      // fire-and-forget hit tracking — dead shares = created long ago, hits = 0
+      supabase.from("shares").select("hits").eq("id", id).maybeSingle().then(({ data: row }) => {
+        supabase.from("shares").update({ hits: (row?.hits ?? 0) + 1, last_accessed_at: new Date().toISOString() }).eq("id", id)
+          .then(() => {}, (e) => console.error("hit track:", e));
+      }, () => {});
       return new Response(
         JSON.stringify(data.data),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
