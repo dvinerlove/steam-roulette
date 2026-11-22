@@ -819,7 +819,7 @@ function App() {
 
         <div className="lg:flex-1 lg:min-w-0 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
           <div className="text-center space-y-4">
-            <h1 className="text-2xl md:text-5xl lg:text-7xl font-black leading-[1.15] pb-[0.12em] bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
+            <h1 className="text-[clamp(1.5rem,4vw,4.5rem)] font-black leading-[1.15] pb-[0.12em] whitespace-nowrap overflow-hidden text-ellipsis bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
               {settings.titles.main}
             </h1>
             <p className="text-slate-200 font-medium text-sm md:text-xl">{settings.titles.subtitle}</p>
