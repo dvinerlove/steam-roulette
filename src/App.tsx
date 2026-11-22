@@ -18,6 +18,24 @@ import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 const uid = () => Math.random().toString(36).slice(2, 11);
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Anonymous usage stats: one random visitor id per browser, no PII
+const trackEvent = (event: 'visit' | 'spin' | 'share') => {
+  if (!API_URL) return;
+  try {
+    let vid = localStorage.getItem('fwVisitorId');
+    if (!vid) {
+      vid = crypto.randomUUID();
+      localStorage.setItem('fwVisitorId', vid);
+    }
+    fetch(`${API_URL}/api/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, visitor: vid, ref: document.referrer || null }),
+      keepalive: true
+    }).catch(() => {});
+  } catch { /* localStorage off — skip tracking */ }
+};
+
 function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [newGameName, setNewGameName] = useState('');
@@ -168,6 +186,7 @@ function App() {
       setLinkCopiedFull(true);
       setTimeout(() => setLinkCopiedFull(false), 2000);
     }
+    trackEvent('share');
     setSharing(false);
   };
 
@@ -496,6 +515,7 @@ function App() {
       setGames(loadedGames);
       setHistory(loadedHistory);
       setInitialized(true);
+      trackEvent('visit');
       if (!shareFailedRef.current) {
         setDbStatus('connected');
         setDbError(null);
@@ -753,6 +773,7 @@ function App() {
 
   const handleResult = async (game: Game) => {
     setSelectedGame(game);
+    trackEvent('spin');
     if (settings.sound.enabled) {
       playWinSound(settings.sound.volume);
     }

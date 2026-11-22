@@ -255,8 +255,74 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Anonymous usage events: POST /api/track {event: 'visit'|'spin'|'share', visitor, ref}
+    if (req.method === "POST" && (pathname === "/api/track" || pathname === "/track")) {
+      if (!await checkRateLimit(clientIp(req), "track", 60, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const body = await req.json();
+        const event = typeof body?.event === "string" ? body.event : "";
+        if (!["visit", "spin", "share"].includes(event)) {
+          return new Response(
+            JSON.stringify({ error: "Invalid event" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const visitor = typeof body?.visitor === "string" ? body.visitor.slice(0, 64) : null;
+        const ref = typeof body?.ref === "string" ? body.ref.slice(0, 300) : null;
+        const { error } = await supabase.from("analytics_events").insert({ event, visitor, ref });
+        if (error) throw error;
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("track:", e);
+        return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
+    // Aggregate usage stats: GET /api/stats — uniques, totals by event, last 14 days
+    if (req.method === "GET" && (pathname === "/api/stats" || pathname === "/stats")) {
+      const { data: rows, error } = await supabase
+        .from("analytics_events")
+        .select("event, visitor, ref, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20000);
+      if (error) throw error;
+      const uniques = new Set<string>();
+      const totals: Record<string, number> = { visit: 0, spin: 0, share: 0 };
+      const referrers: Record<string, number> = {};
+      const daily: Record<string, { visits: number; uniques: Set<string> }> = {};
+      for (const r of rows || []) {
+        totals[r.event] = (totals[r.event] || 0) + 1;
+        if (r.event === "visit" && r.visitor) uniques.add(r.visitor);
+        if (r.ref) {
+          try { const host = new URL(r.ref).hostname; if (host) referrers[host] = (referrers[host] || 0) + 1; } catch { /* bad url */ }
+        }
+        const day = (r.created_at || "").slice(0, 10);
+        if (day) {
+          daily[day] = daily[day] || { visits: 0, uniques: new Set() };
+          if (r.event === "visit") {
+            daily[day].visits++;
+            if (r.visitor) daily[day].uniques.add(r.visitor);
+          }
+        }
+      }
+      const days = Object.entries(daily)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-14)
+        .map(([date, d]) => ({ date, visits: d.visits, uniques: d.uniques.size }));
+      const topRefs = Object.entries(referrers).sort((a, b) => b[1] - a[1]).slice(0, 10)
+        .map(([host, count]) => ({ host, count }));
+      return new Response(
+        JSON.stringify({ uniqueVisitors: uniques.size, totals, days, topReferrers: topRefs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Steam search
-    if (req.method === "GET" && (pathname === "/api/steam/search" || pathname === "/steam/search")) {
       const url = new URL(req.url);
       const query = url.searchParams.get("q") || "";
       const results = await searchSteamGames(query);

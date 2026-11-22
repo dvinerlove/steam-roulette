@@ -5,6 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fortune Wheel — pick a random game</title>
   <meta name="description" content="Fortune Wheel — load your games, spin the wheel and let it decide what to play. Live Steam prices and discounts, shareable links. Free, no sign-up. Есть русская версия." />
+  <link rel="canonical" href="https://dvinerlove.github.io/fortune-wheel/landing.html" />
+  <link rel="alternate" hreflang="en" href="https://dvinerlove.github.io/fortune-wheel/landing.html" />
+  <link rel="alternate" hreflang="ru" href="https://dvinerlove.github.io/fortune-wheel/landing-ru.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Fortune Wheel" />
+  <meta property="og:title" content="Fortune Wheel — pick a random game" />
+  <meta property="og:description" content="Load your games, spin the wheel, get a random pick with live Steam prices and discounts. Free, no sign-up." />
+  <meta property="og:url" content="https://dvinerlove.github.io/fortune-wheel/landing.html" />
+  <meta property="og:image" content="https://dvinerlove.github.io/fortune-wheel/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Fortune Wheel — pick a random game" />
+  <meta name="twitter:description" content="Spin the wheel over your game list. Live Steam prices, custom themes, shareable links." />
+  <meta name="twitter:image" content="https://dvinerlove.github.io/fortune-wheel/og-image.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Fortune Wheel",
+    "url": "https://dvinerlove.github.io/fortune-wheel/",
+    "description": "Free web app that picks a random game from your list — spin the wheel with live Steam prices and discounts, shareable links, custom themes.",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Any",
+    "browserRequirements": "Requires JavaScript",
+    "inLanguage": ["en", "ru"],
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "dvinerlove", "url": "https://github.com/dvinerlove" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "Is Fortune Wheel free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Completely free, no sign-up, no ads. The source code is open on GitHub under the MIT license." } },
+      { "@type": "Question", "name": "How does Fortune Wheel pick a winner?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Every game on the wheel gets an equal sector and an equal 1-in-N chance. The winner is chosen by a cryptographic random generator (crypto.getRandomValues) — no weighting, no tricks." } },
+      { "@type": "Question", "name": "Does it work with Steam?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Games are auto-matched to Steam entries, so you see live regional prices, discounts and game covers right on the wheel." } },
+      { "@type": "Question", "name": "Where is my game list stored?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Only in your browser's local storage — nothing is sent anywhere. Sharing works through a short link that encodes your list and settings." } },
+      { "@type": "Question", "name": "Is there a Russian version?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes, the interface is available in English and Russian — it's auto-detected from your browser language and can be switched in settings." } }
+    ]
+  }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -81,6 +127,11 @@
 
     <section class="features" id="features"></section>
 
+    <section class="wrap" style="max-width:760px;margin:0 auto;padding-bottom:64px">
+      <h2 data-i="faqTitle" style="font-size:28px;font-weight:800;margin-bottom:20px"></h2>
+      <div id="faq"></div>
+    </section>
+
     <footer data-i="footer">
       Made with ❤️ · <a href="https://github.com/dvinerlove/fortune-wheel" rel="noopener">Source on GitHub</a>
     </footer>
@@ -104,6 +155,14 @@
           ['🚀 No sign-up', 'Open and spin. Everything runs in your browser, data stays local.'],
         ],
         title: 'Fortune Wheel — pick a random game',
+        faqTitle: 'FAQ',
+        faq: [
+          ['Is Fortune Wheel free?', 'Yes. Completely free, no sign-up, no ads. The source code is open on GitHub under the MIT license.'],
+          ['How does the wheel pick a winner?', 'Every game gets an equal sector and an equal 1-in-N chance. The winner comes from a cryptographic random generator (crypto.getRandomValues) — no weighting, no tricks.'],
+          ['Does it work with Steam?', 'Yes. Games auto-match to Steam entries: live regional prices, discounts and covers right on the wheel.'],
+          ['Where is my game list stored?', 'Only in your browser\'s local storage — nothing is sent anywhere. Sharing works through a short link that encodes your list and settings.'],
+          ['Is there a Russian version?', 'Yes — English and Russian UI, auto-detected from browser language, switchable in settings.'],
+        ],
       },
       ru: {
         logo: 'Колесо<span>Фортуны</span>',
@@ -121,6 +180,14 @@
           ['🚀 Без регистрации', 'Открыли — крутите. Всё работает в браузере, данные хранятся локально.'],
         ],
         title: 'Колесо Фортуны — случайный выбор игры',
+        faqTitle: 'Частые вопросы',
+        faq: [
+          ['Fortune Wheel бесплатный?', 'Да. Полностью бесплатно, без регистрации и рекламы. Исходный код открыт на GitHub под лицензией MIT.'],
+          ['Как колесо выбирает победителя?', 'У каждой игры равный сектор и шанс 1/N. Победителя выбирает криптографический генератор случайных чисел — без весов и подвоха.'],
+          ['Работает ли это со Steam?', 'Да. Игры автоматически связываются со Steam: живые региональные цены, скидки и обложки прямо на колесе.'],
+          ['Где хранится мой список игр?', 'Только в локальном хранилище вашего браузера — никуда не отправляется. Для шаринга используется короткая ссылка с вашим списком и настройками.'],
+          ['Есть ли английская версия?', 'Да — интерфейс на русском и английском, определяется по языку браузера, переключается в настройках.'],
+        ],
       },
     };
     const params = new URLSearchParams(location.search);
@@ -131,6 +198,8 @@
     document.querySelectorAll('[data-i]').forEach(el => { el.innerHTML = s[el.dataset.i]; });
     document.getElementById('features').innerHTML = s.cards
       .map(([h, p]) => `<div class="card"><h3>${h}</h3><p>${p}</p></div>`).join('');
+    document.getElementById('faq').innerHTML = s.faq
+      .map(([q, a]) => `<div class="card" style="margin-bottom:12px"><h3>${q}</h3><p>${a}</p></div>`).join('');
     document.querySelectorAll('a.lang').forEach(a => a.classList.toggle('active', a.dataset.lang === lang));
   </script>
 </body>

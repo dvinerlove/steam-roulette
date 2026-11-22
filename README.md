@@ -15,15 +15,19 @@ A web app that picks a random game from your list — spin the wheel and let it 
 
 ## ✨ Features
 
-- **Random pick** — fair RNG (`crypto.getRandomValues`) with a smooth decelerating spin
+- **Random pick** — fair RNG (`crypto.getRandomValues`) with a smooth decelerating spin and a soft tick sound that fades as it slows
 - **Steam integration** — auto-matches games in Steam, live prices and discounts for your region, game covers on wheel sectors
-- **Link sharing** — a short link preserves your game list and all settings (Supabase Edge Function + URL-state and localStorage fallbacks)
+- **Link sharing** — a short link preserves your game list and all settings (Supabase Edge Function + URL-state fallback)
+- **Wheel presets** — save several game lists (e.g. "Backlog", "Co-op night") and switch between them
+- **Hide games** — keep a game in the list but off the wheel (not in the mood today)
+- **Elimination mode** — "Remove winner" drops the winning game from the wheel until nothing's left
+- **Shuffle** — reshuffle sector order in one click
 - **Customization** — custom app/wheel backgrounds (image upload), border/pointer/text colors, button text, label position and length, idle spin
-- **Game list** — add games with Steam auto-linking, bulk import, editing, mapping suggestions
+- **Game list** — add games with Steam auto-linking, bulk name import, inline editing, custom sector images
 - **History** — every winning game with price and timestamp
 - **Sound** — synthesized spin and win sounds (Web Audio API, no files)
 - **i18n** — English/Russian UI, auto-detected; Steam region & currency defaults follow the locale
-- **PWA-friendly** — no sign-up, all data stays in your browser
+- **PWA-friendly** — no sign-up, all data stays in your browser; new visitors get a demo wheel to play with
 
 ## 🚀 Getting started
 

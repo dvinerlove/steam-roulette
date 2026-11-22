@@ -1,0 +1,18 @@
+# Fortune Wheel
+
+> Free web app that picks a random game from your list — spin a wheel, get a winner. Live Steam prices and discounts, shareable links, English/Russian UI. No sign-up, data stays in the browser.
+
+## Links
+- App: https://dvinerlove.github.io/fortune-wheel/
+- Promo page: https://dvinerlove.github.io/fortune-wheel/landing.html
+- Source code (MIT): https://github.com/dvinerlove/fortune-wheel
+
+## What it does
+- Spins a wheel over a user-defined game list; fair RNG via crypto.getRandomValues
+- Steam integration: auto-matches games, live regional prices and discounts, game covers
+- Share a wheel + all settings via a short link
+- Custom themes: backgrounds, sector colors, game images, sounds
+- Features: game presets, hidden games, shuffle, winner removal, spin history
+
+## Pricing
+Free. No account, no ads, open source (MIT).

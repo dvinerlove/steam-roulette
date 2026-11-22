@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dvinerlove.github.io/fortune-wheel/sitemap.xml
