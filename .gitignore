@@ -8,7 +8,6 @@ dist/
 # Environment variables
 .env
 .env.local
-.env.example
 backend/.env
 
 # IDE
@@ -26,3 +25,22 @@ Thumbs.db
 test-endpoint.js
 test-endpoint.mjs
 supabase/.temp
+
+# Dev artifacts (agent research, QA screenshots, internal docs)
+research/
+docs/review/
+docs/PROMO.md
+docs/channels-*.md
+docs/competitors-*.md
+docs/habr-article.md
+docs/posts-*.md
+docs/plan-*.md
+
+# One-off SQL snapshots (migrations in supabase/migrations are canonical)
+/schema.sql
+/shares-table.sql
+
+# Ad-hoc screenshot dumps
+/chk*.png
+/s[0-9]*.png
+/rest-*.png
