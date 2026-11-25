@@ -350,9 +350,11 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
             const labelX = 50 + labelRadius * Math.cos((sectorMidAngle * Math.PI) / 180);
             const labelY = 50 + labelRadius * Math.sin((sectorMidAngle * Math.PI) / 180);
 
-            // Как в Wheel of Names: текст всегда читает от центра к краю, без flip —
-            // перевёрнутая сторона стабильна при любом повороте колеса.
-            const textRotation = sectorMidAngle;
+            // Радиальная ориентация как в Wheel of Names, но флипаем лейбл когда
+            // он уходит вверх ногами (левая половина) — иначе нечитаемо.
+            const normA = ((sectorMidAngle % 360) + 360) % 360;
+            const flipped = normA > 90 && normA < 270;
+            const textRotation = sectorMidAngle + (flipped ? 180 : 0);
 
             const displayName = truncateName(game.name);
 
@@ -411,7 +413,7 @@ const FortuneWheel: React.FC<FortuneWheelProps> = ({
                       fill={settings.wheel.textColor}
                       fontSize={fontSize}
                       fontWeight="900"
-                      textAnchor={labelOutward ? 'start' : 'end'}
+                      textAnchor={labelOutward !== flipped ? 'start' : 'end'}
                       dominantBaseline="middle"
                       y="0"
                       className="select-none pointer-events-none"
