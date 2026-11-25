@@ -1017,7 +1017,7 @@ function App() {
           {settings.titles.main}
         </span>
         <div className="flex items-center shrink-0">
-          <button onClick={handleCopyLink} aria-label={t(settings.locale, 'action.shareWheel')} className="p-3 text-slate-300 active:scale-90 transition-transform">
+          <button onClick={() => void handleCopyLink()} aria-label={t(settings.locale, 'action.shareWheel')} className="p-3 text-slate-300 active:scale-90 transition-transform">
             {linkCopied || linkCopiedFull ? <Check size={20} className="text-emerald-400" /> : <Link2 size={20} />}
           </button>
           <button onClick={() => setSettingsOpen(true)} aria-label={t(settings.locale, 'action.settings')} className="p-3 text-slate-300 active:scale-90 transition-transform">
@@ -1084,7 +1084,7 @@ function App() {
                   className="relative bg-slate-900/95 backdrop-blur-lg p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-sm sm:max-w-md">
                   <div className="flex justify-between items-center mb-2">
                     <button
-                      onClick={handleCopyLink}
+                      onClick={() => void handleCopyLink()}
                       className="text-white/60 hover:text-white transition-colors p-2 flex items-center gap-1.5 text-sm"
                       title={t(settings.locale, 'action.shareWheel')}
                     >
@@ -1231,7 +1231,7 @@ function App() {
           </button>
           {listCollapsed && (
             <div className="hidden lg:flex flex-col items-center gap-1 border-t border-slate-700/60 pt-2">
-              <button onClick={handleCopyLink} title={t(settings.locale, 'action.shareWheel')} aria-label={t(settings.locale, 'action.shareWheel')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
+              <button onClick={() => void handleCopyLink()} title={t(settings.locale, 'action.shareWheel')} aria-label={t(settings.locale, 'action.shareWheel')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
                 {linkCopied || linkCopiedFull ? <Check size={16} className="text-emerald-400" /> : <Link2 size={16} />}
               </button>
               <button onClick={() => setHistoryOpen(true)} title={t(settings.locale, 'action.history')} aria-label={t(settings.locale, 'action.history')} className="p-1.5 rounded-md text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60 transition-colors">
@@ -1256,7 +1256,7 @@ function App() {
             <div className="relative">
               <div className="flex">
                 <button
-                  onClick={handleCopyLink}
+                  onClick={() => void handleCopyLink()}
                   disabled={sharing}
                   className={`flex-1 p-3 rounded-l-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white disabled:opacity-50 ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
                 >
