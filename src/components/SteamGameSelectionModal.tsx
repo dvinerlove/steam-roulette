@@ -36,11 +36,13 @@ const SteamGameSelectionModal: React.FC<SteamGameSelectionModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
         transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-        className="bg-slate-800 rounded-lg shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-          <X size={20} />
-        </button>
-        <h2 className="text-xl font-bold text-white mb-4">{t(locale, 'steamSelect.title', { name: gameName })}</h2>
+        className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-white">{t(locale, 'steamSelect.title', { name: gameName })}</h2>
+          <button onClick={onClose} aria-label={t(locale, 'action.close')} className="p-2 -m-1 text-slate-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
         <p className="text-slate-300 mb-4">
           {t(locale, 'steamSelect.hint')}
         </p>

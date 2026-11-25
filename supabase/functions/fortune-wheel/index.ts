@@ -41,7 +41,8 @@ async function checkRateLimit(ip: string, bucket: string, limit: number, windowS
 }
 
 function clientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+  // последний адрес в цепочке ставит инфраструктура; первый клиент может подделать
+  return req.headers.get("x-forwarded-for")?.split(",").pop()?.trim() || "unknown";
 }
 
 // Helper to normalize strings for comparison (ignore case, punctuation, extra spaces)
@@ -329,6 +330,12 @@ Deno.serve(async (req) => {
 
     // Steam search
     if (req.method === "GET" && (pathname === "/api/steam/search" || pathname === "/steam/search")) {
+      if (!await checkRateLimit(clientIp(req), "steam_search", 30, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const url = new URL(req.url);
       const query = url.searchParams.get("q") || "";
       const results = await searchSteamGames(query);
@@ -353,6 +360,12 @@ Deno.serve(async (req) => {
 
     // Get mapping suggestions (most used + search results
     if (req.method === "GET" && (pathname.startsWith("/api/mappings/suggest") || pathname.startsWith("/mappings/suggest"))) {
+      if (!await checkRateLimit(clientIp(req), "steam_search", 30, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const url2 = new URL(req.url);
       const gameName = decodeURIComponent(url2.searchParams.get("gameName") || "");
       const normalizedGameName = normalizeString(gameName);
@@ -486,13 +499,20 @@ Deno.serve(async (req) => {
             { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const hashHex = await sha256Hex(shareDataString);
-
-        // Editable ("live") share when the client proves ownership — secret is
-        // stored only as sha256. Live shares never dedup: identical payloads
-        // must stay separate rows or updating one would hijack the other.
+        // Share modes: snapshot (owner_hash NULL, immutable, dedup by hash),
+        // live (owner_hash = sha256(secret), owner-only writes),
+        // editor (owner_hash = "collab", anyone with the link can write).
+        // shortcut: для collab-ссылок сам id — это право на запись; апгрейд —
+        // отдельный write token, если понадобится разделить read/write.
+        const collab = body.collab === true;
         const ownerSecret = typeof body.owner === "string" && body.owner.length >= 8 ? body.owner : null;
-        const ownerHash = ownerSecret ? await sha256Hex(ownerSecret) : null;
+        const ownerHash = collab ? "collab" : ownerSecret ? await sha256Hex(ownerSecret) : null;
+
+        // hash UNIQUE глобально: у editable шар дедупа нет — солим, чтобы
+        // одинаковый контент мог жить в разных режимах и копиях
+        const hashHex = ownerHash
+          ? await sha256Hex(shareDataString + "|" + crypto.randomUUID())
+          : await sha256Hex(shareDataString);
 
         if (!ownerHash) {
           // Check if a snapshot share with this hash already exists
@@ -552,9 +572,9 @@ Deno.serve(async (req) => {
         const body = await req.json();
         const shareData = body.state || body.data;
         const ownerSecret = typeof body.owner === "string" ? body.owner : "";
-        if (!shareData || !ownerSecret) {
+        if (!shareData) {
           return new Response(
-            JSON.stringify({ error: "Missing state or owner" }),
+            JSON.stringify({ error: "Missing state" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -577,15 +597,18 @@ Deno.serve(async (req) => {
             { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        if (!row.owner_hash || row.owner_hash !== await sha256Hex(ownerSecret)) {
+        if (row.owner_hash !== "collab" && (!row.owner_hash || !ownerSecret || row.owner_hash !== await sha256Hex(ownerSecret))) {
           return new Response(
             JSON.stringify({ error: "Not allowed" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        // keep the salted hash: hash exists only for snapshot dedup, and
+        // rewriting it to sha256(state) collides with identical snapshots.
+        // collab:true upgrades legacy owner-only shares to editor mode.
         const { error: updErr } = await supabase
           .from("shares")
-          .update({ data: shareData, hash: await sha256Hex(shareDataString), updated_at: new Date().toISOString() })
+          .update({ data: shareData, ...(body.collab === true ? { owner_hash: "collab" } : {}), updated_at: new Date().toISOString() })
           .eq("id", id);
         if (updErr) throw updErr;
         return new Response(
@@ -601,10 +624,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get share
+    // Get share — returns the payload plus `editable`/`ownerHash` meta so the
+    // client can tell snapshots from live links and recognise its own shares.
+    // ownerHash is a sha256 of a random UUID — safe to expose, useless to forge.
     if (req.method === "GET" && (pathname.startsWith("/shares/") || pathname.startsWith("/api/shares/"))) {
       const id = pathname.split("/").pop() || "";
-      const { data, error } = await supabase.from("shares").select("data").eq("id", id).maybeSingle();
+      const { data, error } = await supabase.from("shares").select("data, owner_hash").eq("id", id).maybeSingle();
       if (error) throw error;
       if (!data) {
         return new Response(
@@ -618,7 +643,12 @@ Deno.serve(async (req) => {
           .then(() => {}, (e) => console.error("hit track:", e));
       }, () => {});
       return new Response(
-        JSON.stringify(data.data),
+        JSON.stringify({
+          ...data.data,
+          editable: !!data.owner_hash,
+          ownerHash: data.owner_hash === "collab" ? null : data.owner_hash,
+          mode: data.owner_hash === "collab" ? "editor" : data.owner_hash ? "live" : "snapshot"
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -628,6 +658,13 @@ Deno.serve(async (req) => {
       const appId = pathname.split("/").pop() || "";
       const region = url.searchParams.get("region") || "kz";
       const force = url.searchParams.get("force") === "1"; // New: force refresh
+      // force обходит кэш и дёргает Steam — лимитим жёстко, обычные чтения идут из кэша
+      if (force && !await checkRateLimit(clientIp(req), "price_force", 6, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString();
 
       // Check Supabase first, but re-fetch if:

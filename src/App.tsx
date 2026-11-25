@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { Game, Settings, HistoryItem } from './types';
 import { getGameColor, DEFAULT_GAMES } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
@@ -12,8 +13,8 @@ import HistoryPanel from './components/HistoryPanel';
 import SteamGameSelectionModal from './components/SteamGameSelectionModal';
 import WinScreenSteamGameSelectionModal from './components/WinScreenSteamGameSelectionModal';
 import EditGameForm from './components/EditGameForm';
-import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronUp, ChevronRight, Shuffle, Eye, EyeOff, Save } from 'lucide-react';
-import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
+import { Trophy, RefreshCcw, Coins, Search, Plus, X, Settings as SettingsIcon, History as HistoryIcon, ClipboardPaste, Trash2, Link2, Check, Edit2, Gamepad2, ChevronDown, ChevronRight, Shuffle, Eye, EyeOff, Save, Pencil, PencilOff } from 'lucide-react';
+import { motion, AnimatePresence, MotionConfig, useDragControls, useMotionValue, useTransform, animate } from 'framer-motion';
 
 const uid = () => Math.random().toString(36).slice(2, 11);
 const API_URL = import.meta.env.VITE_API_URL;
@@ -27,6 +28,17 @@ const getVisitorId = () => {
   }
   return vid;
 };
+
+// Тот же хэш, что на сервере — сравниваем с ownerHash из ответа, чтобы узнать свою live-ссылку
+const sha256Hex = async (text: string): Promise<string> => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Слепок «сохранённого» колеса: только юзер-поля — авто-обогащение
+// (appId/image/price) и история спинов правками не считаются.
+const wheelFingerprint = (gs: { name: string; color: string; hidden?: boolean }[], s: unknown) =>
+  gs.map(g => `${g.name}|${g.color}|${g.hidden ? 1 : 0}`).join('\n') + '|' + JSON.stringify(s);
 
 const trackEvent = (event: 'visit' | 'spin' | 'share') => {
   if (!API_URL) return;
@@ -59,22 +71,23 @@ function App() {
   const [gameToMapOnWinScreen, setGameToMapOnWinScreen] = useState<Game | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [presets, setPresets] = useState<{ name: string; games: Game[] }[]>(() => {
-    try { const raw = localStorage.getItem('fortuneWheelPresets'); return raw ? JSON.parse(raw) : []; } catch { return []; }
-  });
-  const [selectedPreset, setSelectedPreset] = useState('');
-  const [presetName, setPresetName] = useState('');
-  const [presetSaving, setPresetSaving] = useState(false);
+
   const [initialized, setInitialized] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkCopiedFull, setLinkCopiedFull] = useState(false);
   const [linkUpdated, setLinkUpdated] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [shareMode, setShareMode] = useState<'snapshot' | 'live'>(() =>
-    localStorage.getItem('fwShareMode') === 'live' ? 'live' : 'snapshot');
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [shareMode, setShareMode] = useState<'viewer' | 'editor'>(() =>
+    ['live', 'editor'].includes(localStorage.getItem('fwShareMode') || '') ? 'editor' : 'viewer');
   const [liveShareId, setLiveShareId] = useState<string | null>(() =>
     localStorage.getItem('fwLiveShare'));
   const [liveDirty, setLiveDirty] = useState(false);
+  // Откуда загружены игры: ссылка editable (live) или нет, и наша ли она
+  const [shareOrigin, setShareOrigin] = useState<{ editable: boolean; canUpdate: boolean } | null>(null);
+  const shareBaselineRef = useRef<string | null>(null);
+  const [forkNotice, setForkNotice] = useState(false);
+  const [shareIntroOpen, setShareIntroOpen] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
   const [dbError, setDbError] = useState<string | null>(null);
@@ -82,6 +95,79 @@ function App() {
   const [preloadProgress, setPreloadProgress] = useState(0);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; appId: string; color: string; image: string; }>({ name: '', appId: '', color: '#ffffff', image: '' });
+  const [listHeaderCompact, setListHeaderCompact] = useState(false);
+
+  // Шит списка: два snap-пойнта одним элементом — fullscreen (y=0)
+  // и peek-карточка у низа экрана (y=peekY). Драг морфит одно в другое.
+  const sheetY = useMotionValue(0);
+  const sheetDrag = useDragControls();
+  const isMobileSheet = () => window.matchMedia('(max-width: 1023px)').matches;
+  const reducedMotionNow = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const titleRowRef = useRef<HTMLButtonElement>(null);
+  const [peekY, setPeekY] = useState(0);
+  const peekYRef = useRef(0);
+  const pendingVelRef = useRef(0);
+  const firstSheetPaintRef = useRef(true);
+  const lastDragRef = useRef(0);
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  const lastListScrollRef = useRef(0);
+  // Плавная интерполяция казино-кропа: 2.15x на телефоне (≤480) → 1.0 к десктопу (1024).
+  // Переходных ступеней нет — трансформ непрерывно зависит от ширины.
+  const cropT = Math.min(Math.max((viewportW - 480) / (1024 - 480), 0), 1);
+  const cropStyle: React.CSSProperties | undefined = viewportW < 1024 ? {
+    transform: `translate(${(-37 * (1 - cropT)).toFixed(2)}vw, ${(-10 * (1 - cropT)).toFixed(2)}dvh) scale(${(2.15 - cropT * 1.15).toFixed(3)})`,
+  } : undefined;
+  // SPIN принадлежит peek-состоянию: фейдится по прогрессу морфа, а не живёт до снапа
+  const spinPeekOpacity = useTransform(sheetY, [0, Math.max(peekY, 1)], [0, 1]);
+  const measurePeek = () => {
+    const btn = titleRowRef.current;
+    // display:none (настройки поверх) → offsetParent null, не портим peek
+    if (!btn || !btn.offsetParent) return peekYRef.current;
+    // +44: peek показывает кусочек следующего блока — affordance «тут ещё есть»
+    const y = Math.max(0, window.innerHeight - (btn.offsetTop + btn.offsetHeight + 44));
+    peekYRef.current = y;
+    setPeekY(y);
+    return y;
+  };
+  const springTo = (target: number, velocity = 0) => reducedMotionNow()
+    ? animate(sheetY, target, { duration: 0.2 })
+    : animate(sheetY, target, { type: 'spring', stiffness: 400, damping: 40, bounce: 0, velocity });
+  const expandSheet = (velocity = 0) => {
+    localStorage.setItem('fortuneWheelListCollapsed', '0');
+    pendingVelRef.current = velocity;
+    setListCollapsed(false);
+  };
+  const collapseSheet = (velocity = 0) => {
+    localStorage.setItem('fortuneWheelListCollapsed', '1');
+    pendingVelRef.current = velocity;
+    setListCollapsed(true);
+  };
+  // Единая точка: состояние → snap-target. Контент едет вместе с шитом.
+  useLayoutEffect(() => {
+    const py = measurePeek();
+    if (!isMobileSheet()) { firstSheetPaintRef.current = false; sheetY.set(0); return; }
+    const target = listCollapsed ? py : 0;
+    if (firstSheetPaintRef.current) {
+      firstSheetPaintRef.current = false;
+      if (listCollapsed || reducedMotionNow()) { sheetY.set(target); return; }
+      // первый показ — въезд снизу
+      sheetY.set(window.innerHeight);
+    }
+    springTo(target, pendingVelRef.current);
+    pendingVelRef.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listCollapsed]);
+  // Ресайн/поворот: peek пересчитываем и докатываем шит до цели
+  useEffect(() => {
+    const onResize = () => {
+      setViewportW(window.innerWidth);
+      if (!isMobileSheet()) { sheetY.set(0); return; }
+      if (listCollapsed) sheetY.set(measurePeek());
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listCollapsed]);
   // State for mapping suggestions
   const [mappingSuggestions, setMappingSuggestions] = useState<{ [gameId: string]: MappingSuggestion[] }>({});
   const [showMappingSuggestionsFor, setShowMappingSuggestionsFor] = useState<string | null>(null);
@@ -115,7 +201,8 @@ function App() {
     discount: game.discount,
     originalPrice: game.originalPrice,
     color: game.color || getGameColor(index),
-    image: game.image,
+    // миграция старых тяжёлых header.jpg на миниатюру
+    image: typeof game.image === 'string' ? game.image.replace(/\/apps\/(\d+)\/header\.jpg$/, '/apps/$1/capsule_sm_120.jpg') : game.image,
     hidden: game.hidden
   });
 
@@ -128,8 +215,15 @@ function App() {
     localStorage.removeItem('fortuneWheelHistory');
   };
 
-  const handleCopyLink = async () => {
+  const handleCopyLink = async (modeOverride?: 'viewer' | 'editor') => {
     if (sharing) return;
+    // onClick передаёт объект события — валиден только явный режим из интро/меню
+    const override = modeOverride === 'editor' || modeOverride === 'viewer' ? modeOverride : undefined;
+    // Первый шар и режим никогда не выбирался — сначала интро с объяснением
+    if (!override && !localStorage.getItem('fwShareMode')) {
+      setShareIntroOpen(true);
+      return;
+    }
     setSharing(true);
     setLinkError(null);
     setLinkCopied(false);
@@ -143,17 +237,18 @@ function App() {
         name: game.name,
         appId: game.appId,
         color: game.color,
-        image: game.image
+        image: game.image,
+        hidden: game.hidden
       })) // Save all important game data for perfect sharing!
     };
     const encodedState = btoa(encodeURIComponent(JSON.stringify(state)));
 
-    const live = shareMode === 'live';
-    const createShare = async (withOwner: boolean): Promise<string> => {
+    const collab = (override ?? shareMode) === 'editor';
+    const createShare = async (asCollab: boolean): Promise<string> => {
       const resp = await fetch(`${API_URL}/api/shares`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(withOwner ? { state, owner: getVisitorId() } : { state })
+        body: JSON.stringify(asCollab ? { state, collab: true } : { state })
       });
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
@@ -171,19 +266,18 @@ function App() {
         throw new Error(t(settings.locale, 'err.noApiUrl'));
       }
       let id: string;
-      if (live && liveShareId && !liveDirty) {
-        id = liveShareId; // wheel unchanged — same link is already current
-      } else if (live && liveShareId) {
+      if (collab && liveShareId) {
+        // PUT всегда: заодно апгрейдит старые private-live шары до collab.
         const resp = await fetch(`${API_URL}/api/shares/${liveShareId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state, owner: getVisitorId() })
+          body: JSON.stringify({ state, owner: getVisitorId(), collab: true })
         });
         if (resp.ok) {
           id = liveShareId;
-          updated = true;
+          updated = liveDirty;
         } else if (resp.status === 403 || resp.status === 404) {
-          // ownership lost (other browser / wiped storage) — mint a fresh live link
+          // ownership lost (other browser / wiped storage) — mint a fresh editor link
           id = await createShare(true);
           setLiveShareId(id);
           localStorage.setItem('fwLiveShare', id);
@@ -193,13 +287,16 @@ function App() {
         }
         setLiveDirty(false);
       } else {
-        id = await createShare(live);
-        if (live) {
+        id = await createShare(collab);
+        if (collab) {
           setLiveShareId(id);
           localStorage.setItem('fwLiveShare', id);
           setLiveDirty(false);
         }
       }
+      // слепок = то, что сейчас лежит по ссылке — «Сохранить» появится
+      // только когда локальное состояние от него уедет
+      shareBaselineRef.current = wheelFingerprint(state.games, state.settings);
       url.searchParams.set('share', id);
       url.searchParams.delete('state'); // Remove old state param if exists
       shortLinkSuccess = true;
@@ -366,7 +463,7 @@ function App() {
   // Helper to get Steam game icon URL
   const getSteamGameIconUrl = (appId: string) => {
     // Use Akamai CDN instead of Cloudflare to avoid ORB blocking
-    return `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
+    return `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/capsule_sm_120.jpg`;
   };
 
   const handleSteamGameSelect = async (selectedAppId: string | undefined) => {
@@ -491,7 +588,29 @@ function App() {
           const response = await fetch(`${API_URL}/api/shares/${shareId}`);
           if (response.ok) {
             const sharedState = await response.json();
-            
+
+            // mode/editable есть только у нового API; отсутствие = неизменяемая ссылка
+            const shareApiMode = sharedState.mode as 'editor' | 'live' | 'snapshot' | undefined;
+            const mine = shareApiMode === 'live' && sharedState.ownerHash
+              ? sharedState.ownerHash === await sha256Hex(getVisitorId())
+              : false;
+            const canUpdate = shareApiMode === 'editor' || mine;
+            setShareOrigin({ editable: shareApiMode !== 'snapshot' && sharedState.editable === true, canUpdate });
+            if (canUpdate) {
+              // Ссылка редактируемая нами — продолжаем править её же
+              setShareMode('editor');
+              setLiveShareId(shareId);
+              setLiveDirty(false);
+              localStorage.setItem('fwShareMode', 'editor');
+              localStorage.setItem('fwLiveShare', shareId);
+            } else {
+              // Чужая/viewer-ссылка — забываем свою editor-шару, иначе
+              // «Сохранить» перезапишет её содержимым этой копии
+              setLiveShareId(null);
+              setLiveDirty(false);
+              localStorage.removeItem('fwLiveShare');
+            }
+
             if (sharedState.settings) {
               loadedSettings = mergeSettings(sharedState.settings);
             }
@@ -549,6 +668,14 @@ function App() {
             item?.game ? { ...item, game: normalizeGame(item.game) } : item).filter(Boolean);
         }
       }
+
+      // Длинные state-ссылки тоже нередактируемые — считаем их снапшотами
+      if (loadedFromShare && !shareId) {
+        setShareOrigin({ editable: false, canUpdate: false });
+      }
+      // База сравнения для dirty/форка — «как выглядело колесо при загрузке»
+      // (из ссылки или из localStorage — сравниваем с тем, что отобразили)
+      shareBaselineRef.current = wheelFingerprint(loadedGames, loadedSettings);
 
       // Игры рендерим сразу — не ждём сеть
       setSettings(loadedSettings);
@@ -641,8 +768,15 @@ function App() {
     } catch {
       // Quota exceeded (big images) — не роняем приложение
     }
-    // Live share exists and the wheel moved on — offer "Обновить ссылку"
-    if (liveShareId) setLiveDirty(true);
+    // Реальная правка колеса относительно загруженного/сохранённого слепка?
+    const changed = shareBaselineRef.current !== null &&
+      wheelFingerprint(games, settings) !== shareBaselineRef.current;
+    // Правки своей editor-шары → кнопка «Сохранить» (откат правок её прячет)
+    if (liveShareId) setLiveDirty(changed);
+    // Первая правка чужой/нередактируемой шары — подсказка про собственную копию
+    if (changed && shareOrigin && !shareOrigin.canUpdate && !forkNotice) {
+      setForkNotice(true);
+    }
   }, [settings, games, history, initialized]);
 
   // Заголовок вкладки следует за настраиваемым заголовком
@@ -663,6 +797,11 @@ function App() {
       setShowSteamSearchResultsModal(false);
       setShowWinScreenMappingModal(false);
       setShowMappingSuggestionsFor(null);
+      setManualSearchQuery('');
+      setEditingGame(null);
+      setShareMenuOpen(false);
+      setShareIntroOpen(false);
+      collapseSheet();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -786,29 +925,6 @@ function App() {
     setImportOpen(false);
   };
 
-  const persistPresets = (next: { name: string; games: Game[] }[]) => {
-    setPresets(next);
-    try { localStorage.setItem('fortuneWheelPresets', JSON.stringify(next)); } catch { /* quota */ }
-  };
-  const savePreset = () => {
-    const name = presetName.trim() || selectedPreset;
-    if (!name || games.length === 0) return;
-    persistPresets([...presets.filter(p => p.name !== name), { name, games }]);
-    setSelectedPreset(name);
-    setPresetSaving(false);
-    setPresetName('');
-  };
-  const loadPreset = (name: string) => {
-    setSelectedPreset(name);
-    const p = presets.find(p => p.name === name);
-    if (p) setGames(p.games.map(g => normalizeGame(g)));
-  };
-  const deletePreset = () => {
-    if (!selectedPreset) return;
-    persistPresets(presets.filter(p => p.name !== selectedPreset));
-    setSelectedPreset('');
-  };
-
   const handleRemoveGame = (id: string) => {
     setGames(prev => prev.filter(g => g.id !== id));
   };
@@ -882,7 +998,7 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
     <main
-      className="h-screen text-slate-100 font-sans p-4 md:p-8 transition-all duration-300 overflow-auto [scrollbar-gutter:stable]"
+      className="h-dvh text-slate-100 font-sans p-4 max-lg:pt-0 md:p-8 transition-all duration-300 overflow-hidden lg:overflow-auto [scrollbar-gutter:stable]"
       style={{
         backgroundImage: settings.customization.backgroundImage
           ? `url(${settings.customization.backgroundImage})`
@@ -895,17 +1011,32 @@ function App() {
         backgroundAttachment: 'fixed'
       }}
     >
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:flex gap-8 relative z-10">
+      {/* мобильный топ-бар: заголовок слева, шар/настройки справа — под пальцем */}
+      <div className="lg:hidden sticky top-0 z-40 -mx-4 mb-2 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] flex items-center justify-between gap-3 bg-slate-900 border-b border-white/5">
+        <span className="text-lg font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent truncate">
+          {settings.titles.main}
+        </span>
+        <div className="flex items-center shrink-0">
+          <button onClick={handleCopyLink} aria-label={t(settings.locale, 'action.shareWheel')} className="p-3 text-slate-300 active:scale-90 transition-transform">
+            {linkCopied || linkCopiedFull ? <Check size={20} className="text-emerald-400" /> : <Link2 size={20} />}
+          </button>
+          <button onClick={() => setSettingsOpen(true)} aria-label={t(settings.locale, 'action.settings')} className="p-3 text-slate-300 active:scale-90 transition-transform">
+            <SettingsIcon size={20} />
+          </button>
+        </div>
+      </div>
 
-        <div className="lg:flex-1 lg:min-w-0 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
-          <div className={`text-center space-y-4 transition-transform duration-300 ease-out ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`}>
-            <h1 className="text-[clamp(1.5rem,4vw,4.5rem)] font-black leading-[1.15] pb-[0.12em] whitespace-nowrap overflow-hidden text-ellipsis bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row min-h-[calc(100dvh-5.5rem)] lg:min-h-[calc(100dvh-4rem)] gap-8 relative">
+
+        <div className="flex-1 lg:min-w-0 flex flex-col items-center justify-center space-y-8 relative px-4 order-1 lg:order-2">
+          <div className={`text-center space-y-4 transition-transform duration-300 ease-out max-lg:hidden ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`}>
+            <h1 className="text-[clamp(1.9rem,7vw,4.5rem)] font-black leading-[1.15] pb-[0.12em] whitespace-nowrap overflow-hidden text-ellipsis bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-lg">
               {settings.titles.main}
             </h1>
             <p className="text-slate-200 font-medium text-sm md:text-xl">{settings.titles.subtitle}</p>
           </div>
 
-          <div className={`relative transition-transform duration-300 ease-out ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`}>
+          <div className={`relative transition-transform duration-300 ease-out ${settingsOpen ? 'lg:-translate-x-[300px]' : ''}`} style={cropStyle}>
             <FortuneWheel
               games={visibleGames}
               onResult={handleResult} 
@@ -914,6 +1045,7 @@ function App() {
               settings={settings}
               onSpinStart={handleSpinStart}
               isWinPopupOpen={selectedGame !== null}
+              winnerIndex={selectedGame ? visibleGames.indexOf(selectedGame) : -1}
               onTick={(f) => settings.sound.enabled && playTick(settings.sound.volume * f)}
             />
           </div>
@@ -926,7 +1058,7 @@ function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0, transition: { duration: 0.15, ease: 'easeOut' } }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+                className="fixed inset-0 z-[80] flex items-center justify-center p-4"
               >
                 {/* Backdrop */}
                 <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedGame(null)} />
@@ -1020,7 +1152,7 @@ function App() {
                       </a>
                     )}
                     <button
-                      onClick={() => { setGames(prev => prev.filter(g => g.id !== selectedGame.id)); setSelectedGame(null); }}
+                      onClick={() => { setGames(prev => prev.map(g => g.id === selectedGame.id ? { ...g, hidden: true } : g)); setSelectedGame(null); }}
                       className="text-red-300/70 hover:text-red-200 text-sm transition-colors mt-3 underline underline-offset-4"
                     >
                       {t(settings.locale, 'win.removeFromWheel')}
@@ -1033,30 +1165,68 @@ function App() {
           </AnimatePresence>
         </div>
 
-        <div className={`space-y-6 bg-slate-800/70 backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity,padding,margin,border-color] lg:duration-300 lg:ease-out ${
+        <motion.div
+          style={{ y: sheetY }}
+          drag="y"
+          dragListener={false}
+          dragControls={sheetDrag}
+          dragMomentum={false}
+          dragConstraints={{ top: 0, bottom: peekY }}
+          dragElastic={0.15}
+          onDragStart={() => sheetY.stop()}
+          onDragEnd={(_, info) => {
+            lastDragRef.current = performance.now();
+            // Snap к ближайшему пойнту по спроецированной точке остановки (Apple: d≈0.998)
+            const projected = sheetY.get() + (info.velocity.y / 1000) * (0.998 / (1 - 0.998));
+            const v = info.velocity.y;
+            const py = peekYRef.current;
+            if (Math.abs(projected) < Math.abs(projected - py)) {
+              listCollapsed ? expandSheet(v) : springTo(0, v);
+            } else {
+              listCollapsed ? springTo(py, v) : collapseSheet(v);
+            }
+          }}
+          className={`space-y-3 bg-slate-800/70 max-lg:bg-slate-900 max-lg:will-change-transform lg:backdrop-blur-md rounded-2xl border border-slate-700 h-fit order-2 lg:order-1 lg:self-start lg:shrink-0 lg:overflow-hidden lg:transition-[width,opacity,padding,margin,border-color] lg:duration-300 lg:ease-out max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:h-dvh max-lg:z-50 max-lg:m-0 max-lg:rounded-b-none max-lg:border-x-0 max-lg:border-b-0 max-lg:pb-[env(safe-area-inset-bottom)] max-lg:flex max-lg:flex-col max-lg:overscroll-contain max-lg:shadow-2xl max-lg:p-4 ${
           settingsOpen
-            ? 'p-6 lg:w-0 lg:p-0 lg:border-transparent lg:opacity-0 lg:-mr-8 lg:pointer-events-none'
+            ? 'lg:w-0 lg:p-0 lg:border-transparent lg:opacity-0 lg:-mr-8 lg:pointer-events-none max-lg:hidden'
             : listCollapsed
-              ? 'p-3 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 lg:cursor-pointer group'
-              : 'p-6 lg:w-1/3'
+              ? 'lg:mt-0 lg:w-14 lg:p-2 lg:opacity-60 lg:hover:opacity-100 lg:hover:border-indigo-500/50 lg:hover:bg-slate-800/90 group'
+              : 'lg:w-1/3'
         }`}>
+          {/* drag-ручка шита — мобилка; тап тоже тоглит */}
+          <div
+            className="lg:hidden flex justify-center pt-0.5 pb-1.5 cursor-grab active:cursor-grabbing touch-pan-x select-none"
+            onPointerDown={(e) => sheetDrag.start(e)}
+            onClick={() => { if (performance.now() - lastDragRef.current > 300) (listCollapsed ? expandSheet : collapseSheet)(); }}
+          >
+            <div className="w-10 h-1.5 rounded-full bg-slate-500/80" />
+          </div>
+          {/* большая SPIN-кнопка в зоне большого пальца — мобилка */}
+          <motion.button
+            onClick={() => (document.querySelector('[data-spin-btn]') as HTMLButtonElement)?.click()}
+            disabled={isSpinning || visibleGames.length === 0}
+            className={`${listCollapsed ? 'lg:hidden' : 'hidden'} w-full h-14 rounded-xl bg-indigo-600 font-black text-lg tracking-widest text-white active:scale-[0.97] transition-transform disabled:opacity-50`}
+            style={{ opacity: spinPeekOpacity }}
+          >
+            {settings.spinButton.text}
+          </motion.button>
           <button
-            onClick={() => { localStorage.setItem('fortuneWheelListCollapsed', listCollapsed ? '0' : '1'); setListCollapsed(!listCollapsed); }}
+            ref={titleRowRef}
+            onClick={() => { if (performance.now() - lastDragRef.current > 300) (listCollapsed ? expandSheet : collapseSheet)(); }}
+            onPointerDown={(e) => { if (isMobileSheet()) sheetDrag.start(e); }}
             aria-expanded={!listCollapsed}
             title={t(settings.locale, listCollapsed ? 'games.expandList' : 'games.collapseList')}
-            className={`group w-full flex items-center justify-between text-xl font-bold py-1 rounded-lg transition-colors duration-200 hover:bg-slate-700/40 ${listCollapsed ? 'lg:justify-center' : '-mx-2 px-2'}`}
+            className={`group w-full flex items-center justify-between text-xl font-bold py-1 rounded-lg transition-colors duration-200 hover:bg-slate-700/40 touch-pan-x select-none ${listCollapsed ? 'lg:justify-center' : '-mx-2 px-2'}`}
           >
             <span className={`flex items-center gap-2 ${listCollapsed ? 'lg:hidden' : ''}`}>
               <Gamepad2 className="text-indigo-400" />
-              {t(settings.locale, 'games.title')} ({visibleGames.length})
+              {t(settings.locale, 'games.title')} <span className={listCollapsed ? 'max-lg:hidden' : ''}>({visibleGames.length})</span>
             </span>
             {listCollapsed && (
               <ChevronRight size={16} className="hidden lg:block text-slate-500 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-400" />
             )}
-            {listCollapsed ? (
-              <ChevronDown size={20} className="text-slate-400 lg:hidden" />
-            ) : (
-              <ChevronUp size={20} className="text-slate-400 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:text-indigo-400" />
+            {!listCollapsed && (
+              <ChevronDown size={20} className="hidden lg:block text-slate-400 transition-all duration-200 group-hover:translate-y-0.5 group-hover:text-indigo-400" />
             )}
           </button>
           {listCollapsed && (
@@ -1073,44 +1243,77 @@ function App() {
             </div>
           )}
           <AnimatePresence initial={false}>
-          {!listCollapsed && (
+          {(!listCollapsed || isMobileSheet()) && (
           <motion.div
             key="gameList"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="overflow-hidden"
+            className="overflow-hidden max-lg:flex max-lg:flex-col max-lg:flex-1 max-lg:min-h-0"
           >
-          <div className="flex flex-col gap-3 mb-4">
-            <div>
-              <button
-                onClick={handleCopyLink}
-                disabled={sharing}
-                className={`w-full p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white disabled:opacity-50 ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
-              >
-                {linkCopied || linkCopiedFull || linkUpdated ? <Check size={20} /> : <Link2 size={20} />}
-                <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : linkUpdated ? t(settings.locale, 'share.updated') : (shareMode === 'live' && liveShareId && liveDirty) ? t(settings.locale, 'share.update') : t(settings.locale, 'action.shareWheel')}</span>
-              </button>
-              <label className="mt-2 flex items-start gap-2 text-xs text-slate-400 cursor-pointer select-none" title={t(settings.locale, 'share.liveHint')}>
-                <input
-                  type="checkbox"
-                  checked={shareMode === 'live'}
-                  onChange={(e) => {
-                    const mode = e.target.checked ? 'live' : 'snapshot';
-                    setShareMode(mode);
-                    localStorage.setItem('fwShareMode', mode);
-                  }}
-                  className="mt-0.5 accent-indigo-500"
-                />
-                <span>{t(settings.locale, 'share.modeLive')}<br /><span className="text-slate-500">{t(settings.locale, 'share.liveHint')}</span></span>
-              </label>
+          <div className={`flex flex-col gap-3 max-lg:transition-[max-height,opacity,margin] max-lg:duration-200 max-lg:ease-out max-lg:overflow-hidden ${listHeaderCompact ? 'max-lg:max-h-0 max-lg:opacity-0 max-lg:mb-0 lg:mb-4' : 'max-lg:max-h-80 max-lg:opacity-100 mb-4'}`}>
+            <div className="relative">
+              <div className="flex">
+                <button
+                  onClick={handleCopyLink}
+                  disabled={sharing}
+                  className={`flex-1 p-3 rounded-l-lg transition-colors flex items-center justify-center gap-2 font-semibold text-white disabled:opacity-50 ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                >
+                  {linkCopied || linkCopiedFull || linkUpdated ? <Check size={20} /> : (shareMode === 'editor' && liveShareId && liveDirty) ? <Save size={20} /> : <Link2 size={20} />}
+                  <span className="whitespace-nowrap">{linkCopied ? t(settings.locale, 'action.shareCopied') : linkCopiedFull ? t(settings.locale, 'action.shareCopiedFull') : linkUpdated ? t(settings.locale, 'share.updated') : (shareMode === 'editor' && liveShareId && liveDirty) ? t(settings.locale, 'share.update') : t(settings.locale, 'action.shareWheel')}</span>
+                </button>
+                <button
+                  onClick={() => setShareMenuOpen(v => !v)}
+                  title={t(settings.locale, 'share.modeTitle')}
+                  aria-label={t(settings.locale, 'share.modeTitle')}
+                  className={`px-2.5 rounded-r-lg border-l border-white/20 transition-colors text-white ${linkCopied || linkCopiedFull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                >
+                  {shareMode === 'editor' ? <Pencil size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {shareMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShareMenuOpen(false)} />
+                  <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden">
+                    {(['viewer', 'editor'] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setShareMode(mode);
+                          localStorage.setItem('fwShareMode', mode);
+                          setShareMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-slate-700 flex items-start gap-2 transition-colors"
+                      >
+                        <span className="w-4 shrink-0 mt-0.5">{shareMode === mode && <Check size={14} className="text-indigo-400" />}</span>
+                        {mode === 'editor'
+                          ? <Pencil size={14} className="shrink-0 mt-0.5 text-slate-400" />
+                          : <Eye size={14} className="shrink-0 mt-0.5 text-slate-400" />}
+                        <span className="min-w-0">
+                          <span className="block text-slate-200">{t(settings.locale, mode === 'editor' ? 'share.modeEditor' : 'share.modeViewer')}</span>
+                          <span className="block text-slate-500">{t(settings.locale, mode === 'editor' ? 'share.editorHint' : 'share.viewerHint')}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               {linkError && (
                 <div className="mt-1 text-xs text-red-400 break-all">
                   {linkError}
                 </div>
               )}
             </div>
+            {forkNotice && (
+              <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-xs text-amber-200">
+                <PencilOff size={14} className="shrink-0 mt-0.5 text-amber-400" />
+                <span className="flex-1">{t(settings.locale, shareOrigin?.editable ? 'fork.noticeLive' : 'fork.noticeSnapshot')}</span>
+                <button onClick={() => setForkNotice(false)} aria-label={t(settings.locale, 'action.close')} className="text-amber-300/70 hover:text-amber-100 shrink-0">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-5 gap-2">
               <button onClick={() => setImportOpen(true)} className="text-slate-400 hover:text-white py-2 rounded-lg hover:bg-slate-700 transition flex flex-col items-center justify-center gap-1" title={t(settings.locale, 'action.import')}>
                 <ClipboardPaste size={20} />
@@ -1133,47 +1336,6 @@ function App() {
                 <span className="text-[11px] leading-none whitespace-nowrap">{t(settings.locale, 'action.settings')}</span>
               </button>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={selectedPreset}
-                onChange={(e) => e.target.value ? loadPreset(e.target.value) : setSelectedPreset('')}
-                aria-label={t(settings.locale, 'presets.label')}
-                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-2 text-slate-300 text-sm min-w-0"
-              >
-                <option value="">{t(settings.locale, 'presets.none')}</option>
-                {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-              </select>
-              {presetSaving ? (
-                <input
-                  autoFocus
-                  value={presetName}
-                  onChange={(e) => setPresetName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && savePreset()}
-                  onBlur={savePreset}
-                  placeholder={t(settings.locale, 'presets.name')}
-                  className="w-28 bg-slate-700 border border-indigo-500 rounded-lg px-2 py-2 text-white text-sm"
-                />
-              ) : (
-                <button
-                  onClick={() => selectedPreset ? savePreset() : setPresetSaving(true)}
-                  title={t(settings.locale, 'presets.save')}
-                  aria-label={t(settings.locale, 'presets.save')}
-                  className="px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
-                >
-                  <Save size={18} />
-                </button>
-              )}
-              {selectedPreset && (
-                <button
-                  onClick={deletePreset}
-                  title={t(settings.locale, 'presets.delete')}
-                  aria-label={t(settings.locale, 'presets.delete')}
-                  className="px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition"
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
-            </div>
           </div>
 
           <div className="flex gap-2">
@@ -1184,7 +1346,7 @@ function App() {
                 onChange={(e) => setNewGameName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddGame()}
                 placeholder={t(settings.locale, 'games.addPlaceholder')}
-                className="w-full bg-slate-700 border-none rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 text-slate-100"
+                className="w-full bg-slate-700 border-none rounded-lg py-2 px-3 min-h-[44px] focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 text-slate-100"
               />
             </div>
             <button
@@ -1197,7 +1359,17 @@ function App() {
 
 
 
-          <div className="mt-3 max-h-[60vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_14px)]">
+          <div
+            onScroll={(e) => {
+              const st = e.currentTarget.scrollTop;
+              const last = lastListScrollRef.current;
+              // классика «hide on scroll down / show on scroll up»
+              if (st <= 8 || st < last - 4) setListHeaderCompact(false);
+              else if (st > last + 4 && st > 24) setListHeaderCompact(true);
+              lastListScrollRef.current = st;
+            }}
+            className="mt-3 lg:max-h-[60vh] max-lg:flex-1 max-lg:min-h-0 overflow-y-auto space-y-2 pr-2 custom-scrollbar pt-1 [mask-image:linear-gradient(to_bottom,transparent,black_24px)]"
+          >
             {games.length === 0 && (
               <p className="text-slate-400 text-sm text-center py-6">
                 {t(settings.locale, 'games.empty')}
@@ -1208,55 +1380,72 @@ function App() {
               <motion.div
                 key={game.id}
                 layout
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
                 className="flex flex-col bg-slate-700/50 p-3 rounded-lg border border-slate-600"
               >
-                {editingGame?.id === game.id ? (
-                  <EditGameForm
-                    loc={settings.locale}
-                    editForm={editForm}
-                    setEditForm={setEditForm}
-                    onSave={saveEditedGame}
-                    onCancel={() => setEditingGame(null)}
-                  />
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className={`flex items-center gap-3 overflow-hidden ${game.hidden ? 'opacity-40' : ''}`}>
-                        <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: game.color }} />
-                        <div className="overflow-hidden">
-                          <span className="truncate text-sm font-medium block" title={game.name}>{game.name}</span>
-                          {settings.prices.showPrices && game.price && (
-                            <span className="text-xs text-green-400 block">{game.price}</span>
-                          )}
+                {editingGame?.id === game.id && createPortal(
+                    <div role="dialog" aria-modal="true" aria-label={t(settings.locale, 'games.edit')} className="fixed inset-0 z-[70] bg-slate-900 lg:bg-black/60 lg:backdrop-blur-sm lg:flex lg:items-center lg:justify-center max-lg:animate-[sheetUp_0.25s_ease-out] overscroll-contain" onClick={() => setEditingGame(null)}>
+                      <div className="max-lg:h-full max-lg:overflow-y-auto max-lg:p-4 lg:w-full lg:max-w-md lg:bg-slate-800 lg:border lg:border-slate-600 lg:rounded-2xl lg:p-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold text-white">{t(settings.locale, 'games.edit')}</h3>
+                          <button onClick={() => setEditingGame(null)} aria-label={t(settings.locale, 'action.close')} className="p-2 -m-1 text-slate-400 hover:text-white">
+                            <X size={20} />
+                          </button>
                         </div>
+                        <EditGameForm
+                          loc={settings.locale}
+                          editForm={editForm}
+                          setEditForm={setEditForm}
+                          onSave={saveEditedGame}
+                          onCancel={() => setEditingGame(null)}
+                        />
                       </div>
-                      <div className="flex items-center gap-1">
+                    </div>,
+                    document.body
+                  )}
+                <>
+                    <div className={`flex items-center gap-3 ${game.hidden ? 'opacity-40' : ''}`}>
+                      <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden border" style={{ borderColor: game.color, backgroundColor: `${game.color}33` }}>
+                        {(() => {
+                          const rowImg = game.image && !game.image.includes('header.jpg')
+                            ? game.image
+                            : game.appId ? getSteamGameIconUrl(game.appId) : game.image;
+                          return rowImg && (
+                            <img src={rowImg} alt="" loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                          );
+                        })()}
+                      </div>
+                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                        <span className="truncate flex-1 text-sm font-medium" title={game.name}>{game.name}</span>
+                        {settings.prices.showPrices && game.price && (
+                          <span className="text-xs text-slate-400 shrink-0">{game.price}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setGames(prev => prev.map(g => g.id === game.id ? { ...g, hidden: !g.hidden } : g))}
                           title={t(settings.locale, game.hidden ? 'games.showOnWheel' : 'games.hideFromWheel')}
                           aria-label={t(settings.locale, game.hidden ? 'games.showOnWheel' : 'games.hideFromWheel')}
-                          className={`p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center ${game.hidden ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`}
+                          className={`p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center ${game.hidden ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`}
                         >
                           {game.hidden ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                         {settings.steam.enableIntegration && (
                           <button
                             onClick={() => handleToggleSuggestions(game)}
-                            className="text-indigo-400 hover:text-indigo-300 text-xs font-semibold px-2 py-1 min-w-[40px] min-h-[40px] bg-indigo-900/30 rounded transition-all flex items-center justify-center"
+                            className="text-indigo-400 hover:text-indigo-300 p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                             title={t(settings.locale, 'games.findGame')}
                           >
-                            <Search size={16} />
+                            <Search size={18} />
                           </button>
                         )}
                         <button
                           onClick={() => handleEditGame(game)}
                           title={t(settings.locale, 'games.edit')}
                           aria-label={t(settings.locale, 'games.edit')}
-                          className="text-slate-400 hover:text-indigo-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
+                          className="text-slate-400 hover:text-indigo-400 p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <Edit2 size={18} />
                         </button>
@@ -1264,22 +1453,29 @@ function App() {
                           onClick={() => handleRemoveGame(game.id)}
                           title={t(settings.locale, 'games.remove')}
                           aria-label={t(settings.locale, 'games.remove')}
-                          className="text-slate-400 hover:text-red-400 p-2 min-w-[40px] min-h-[40px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
+                          className="text-red-400/60 hover:text-red-400 p-2 min-w-[44px] min-h-[44px] rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center"
                         >
                           <X size={18} />
                         </button>
                       </div>
+                      </div>
                     </div>
-                    {showMappingSuggestionsFor === game.id && (
-                      <div className="mt-2 space-y-2 bg-slate-800/70 p-3 rounded-lg">
-                        <h4 className="text-xs font-bold text-slate-300 mb-2">{t(settings.locale, 'games.pickPrompt')}</h4>
+                    {showMappingSuggestionsFor === game.id && createPortal(
+                      <div role="dialog" aria-modal="true" aria-label={t(settings.locale, 'games.pickPrompt')} className="fixed inset-0 z-[70] bg-slate-900 lg:bg-black/60 lg:backdrop-blur-sm lg:flex lg:items-center lg:justify-center overscroll-contain" onClick={() => { setShowMappingSuggestionsFor(null); setManualSearchQuery(''); }}>
+                      <div className="space-y-2 bg-slate-900 lg:bg-slate-800 p-4 lg:p-5 max-lg:h-full max-lg:overflow-y-auto max-lg:animate-[sheetUp_0.25s_ease-out] lg:w-full lg:max-w-md lg:border lg:border-slate-600 lg:rounded-2xl lg:max-h-[80vh] lg:overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-lg font-bold text-white">{t(settings.locale, 'games.pickPrompt')}</h4>
+                          <button onClick={() => { setShowMappingSuggestionsFor(null); setManualSearchQuery(''); }} aria-label={t(settings.locale, 'action.close')} className="p-2 -m-1 text-slate-400 hover:text-white">
+                            <X size={20} />
+                          </button>
+                        </div>
                         <div className="flex gap-2 mb-2">
                           <input
                             type="text"
                             value={manualSearchQuery}
                             onChange={(e) => setManualSearchQuery(e.target.value)}
                             placeholder={t(settings.locale, 'games.searchPlaceholder')}
-                            className="flex-1 text-sm px-3 py-2 rounded bg-slate-700 text-white placeholder-slate-400 border border-slate-600"
+                            className="flex-1 text-sm px-3 py-2 rounded-lg bg-slate-700 text-white placeholder-slate-400 border border-slate-600"
                           />
                           <button
                             onClick={async () => {
@@ -1304,37 +1500,23 @@ function App() {
                               setManualSearchLoading(false);
                             }}
                             disabled={manualSearchLoading}
-                            className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+                            className="px-3 py-2 min-w-[44px] min-h-[44px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
                           >
-                            {manualSearchLoading ? '...' : t(settings.locale, 'games.search')}
+                            {manualSearchLoading ? '…' : <><Search size={16} className="lg:hidden" /><span className="max-lg:hidden">{t(settings.locale, 'games.search')}</span></>}
                           </button>
                         </div>
                         {mappingSuggestions[game.id]?.map((suggestion) => (
                           <button
                             key={suggestion.appId}
                             onClick={() => handleApplyMappingSuggestion(game.id, suggestion.appId)}
-                            className="w-full flex items-center gap-2 p-3 rounded bg-slate-700 hover:bg-slate-600 transition-all text-left"
+                            className="w-full flex items-center gap-2 p-3 rounded-lg bg-slate-700 hover:bg-slate-600 transition-all text-left"
                           >
-                            {suggestion.icon ? (
-                              <img 
-                                src={suggestion.icon} 
-                                alt="" 
-                                className="w-10 h-10 rounded flex-shrink-0" 
-                                onError={(e) => {
-                                  // If image fails to load, replace with placeholder
-                                  const img = e.target as HTMLImageElement;
-                                  const placeholder = document.createElement('div');
-                                  placeholder.className = 'w-10 h-10 rounded flex-shrink-0 flex items-center justify-center text-slate-300';
-                                  placeholder.style.backgroundColor = 'rgba(148, 163, 184, 0.2)';
-                                  placeholder.innerHTML = '🎮';
-                                  img.replaceWith(placeholder);
-                                }}
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded flex-shrink-0 flex items-center justify-center text-slate-300" style={{ backgroundColor: 'rgba(148, 163, 184, 0.2)' }}>
-                                🎮
-                              </div>
-                            )}
+                            <div className="w-10 h-10 rounded-lg flex-shrink-0 relative overflow-hidden flex items-center justify-center" style={{ backgroundColor: 'rgba(148, 163, 184, 0.2)' }}>
+                              <Gamepad2 size={20} className="text-slate-400" />
+                              {suggestion.icon && (
+                                <img src={suggestion.icon} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                              )}
+                            </div>
                             <div className="flex-1">
                               <span className="text-sm font-medium text-white">{suggestion.name}</span>
                               <div className="flex gap-1 mt-1">
@@ -1348,19 +1530,11 @@ function App() {
                             </div>
                           </button>
                         ))}
-                        <button
-                          onClick={() => {
-                            setShowMappingSuggestionsFor(null);
-                            setManualSearchQuery('');
-                          }}
-                          className="mt-2 text-sm text-slate-400 hover:text-white"
-                        >
-                          {t(settings.locale, 'action.cancel')}
-                        </button>
                       </div>
+                      </div>,
+                      document.body
                     )}
                   </>
-                )}
               </motion.div>
             ))}
             </AnimatePresence>
@@ -1368,7 +1542,7 @@ function App() {
           </motion.div>
           )}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
 
       <SettingsPanel
@@ -1457,6 +1631,61 @@ function App() {
                   {t(settings.locale, 'action.cancel')}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Интро выбора типа ссылки — показывается один раз при первом шаре */}
+      <AnimatePresence>
+        {shareIntroOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            onClick={() => setShareIntroOpen(false)}
+          >
+            <motion.div
+              role="dialog" aria-modal="true" aria-label={t(settings.locale, 'share.introTitle')}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15, ease: 'easeOut' } }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+              className="bg-slate-800 rounded-2xl border border-slate-700 p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xl font-bold text-white">{t(settings.locale, 'share.introTitle')}</h3>
+                <button onClick={() => setShareIntroOpen(false)} className="text-slate-400 hover:text-white">
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-slate-400 text-sm mb-4">{t(settings.locale, 'share.introBody')}</p>
+              <div className="flex flex-col gap-2">
+                {(['viewer', 'editor'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setShareMode(mode);
+                      localStorage.setItem('fwShareMode', mode);
+                      setShareIntroOpen(false);
+                      handleCopyLink(mode);
+                    }}
+                    className="flex items-start gap-3 text-left p-3 rounded-lg border border-slate-600 hover:border-indigo-500 hover:bg-slate-700/60 transition-colors"
+                  >
+                    {mode === 'editor'
+                      ? <Pencil size={20} className="text-indigo-400 shrink-0 mt-0.5" />
+                      : <Eye size={20} className="text-slate-400 shrink-0 mt-0.5" />}
+                    <span>
+                      <span className="block font-semibold text-white text-sm">{t(settings.locale, mode === 'editor' ? 'share.modeEditor' : 'share.modeViewer')}</span>
+                      <span className="block text-xs text-slate-400 mt-0.5">{t(settings.locale, mode === 'editor' ? 'share.editorHint' : 'share.viewerHint')}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-slate-500">{t(settings.locale, 'share.introLater')}</p>
             </motion.div>
           </motion.div>
         )}

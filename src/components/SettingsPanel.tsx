@@ -5,7 +5,7 @@ import type { Settings } from '../types';
 import SettingsAppearancePanel from './SettingsAppearancePanel';
 import SettingsIntegrationPanel from './SettingsIntegrationPanel';
 import SettingsDataPanel from './SettingsDataPanel';
-import { Settings as SettingsIcon, Palette, Gamepad2, Tag } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Gamepad2, Tag, X } from 'lucide-react';
 import { t } from '../i18n';
 
 interface SettingsPanelProps {
@@ -59,12 +59,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </h2>
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setIsOpen(false)} aria-label={t(settings.locale, 'action.close')} title={t(settings.locale, 'action.close')} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700">
-              ✕
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="p-4 border-b border-slate-700 flex gap-2 flex-wrap">
+        <div className="p-4 border-b border-slate-700 flex gap-2">
           {[
             { id: 'appearance', icon: Palette, label: t(settings.locale, 'settings.appearance') },
             { id: 'integration', icon: Gamepad2, label: t(settings.locale, 'settings.integrations') },
@@ -73,7 +73,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all whitespace-nowrap text-sm ${
                 activeTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
               }`}
             >
