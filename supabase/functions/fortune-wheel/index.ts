@@ -106,6 +106,99 @@ async function fetchSteamPriceFromAPI(appId: string, region: string) {
   };
 }
 
+// --- Steam import: wishlist / deals -------------------------------------
+// wishlistdata убит Steam в конце 2024; официальная замена IWishlistService
+// (без ключа) + батч-обогащение через IStoreBrowseService/GetItems.
+
+interface ImportGame {
+  appId: number;
+  name: string;
+  priority?: number;
+  price: number | null;
+  originalPrice: number | null;
+  discount: number;
+  currency: string | null;
+}
+
+// In-memory кэш изолята — эфемерный, но Steam и так отдаёт быстро;
+// DB-кэш — апгрейд если упрёмся в rate limits.
+// shortcut: per-isolate cache, upgrade path — shared DB cache table
+const memCache = new Map<string, { data: unknown; expires: number }>();
+function cacheGet(key: string): unknown | null {
+  const hit = memCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expires) { memCache.delete(key); return null; }
+  return hit.data;
+}
+function cacheSet(key: string, data: unknown, ttlSec: number) {
+  if (memCache.size > 500) memCache.clear();
+  memCache.set(key, { data, expires: Date.now() + ttlSec * 1000 });
+}
+
+// Вход пользователя в steamid64: голый id64, /profiles/<id>, /id/<vanity>, голый vanity
+function parseSteamInput(raw: string): { kind: "id64" | "vanity"; value: string } | null {
+  const s = raw.trim().replace(/\/+$/, "");
+  if (!s) return null;
+  if (/^7656\d{13}$/.test(s)) return { kind: "id64", value: s };
+  const profiles = s.match(/(?:steamcommunity\.com\/)?profiles\/(7656\d{13})/i);
+  if (profiles) return { kind: "id64", value: profiles[1] };
+  const vanityUrl = s.match(/(?:steamcommunity\.com\/)?id\/([^\s/?#]+)/i);
+  if (vanityUrl) return { kind: "vanity", value: vanityUrl[1] };
+  if (/^[a-zA-Z0-9_-]{2,32}$/.test(s) && !/^\d+$/.test(s)) return { kind: "vanity", value: s };
+  return null;
+}
+
+// vanity → steamid64 через публичный XML-профиль (без API-ключа)
+async function resolveVanity(vanity: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(vanity)}?xml=1`);
+    if (!res.ok) return null;
+    const xml = await res.text();
+    const m = xml.match(/<steamID64>(7656\d{13})<\/steamID64>/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+// Батч-обогащение appid'ов именами/ценами/скидками одним запросом на ~50 штук
+async function enrichSteamApps(appIds: number[], cc: string, lang: string): Promise<Map<number, ImportGame>> {
+  const out = new Map<number, ImportGame>();
+  const CHUNK = 50;
+  for (let i = 0; i < appIds.length; i += CHUNK) {
+    const ids = appIds.slice(i, i + CHUNK).map(appid => ({ appid }));
+    const input = {
+      ids,
+      context: { country_code: cc.toUpperCase(), language: lang },
+      data_request: { include_basic_info: false, include_all_purchase_options: true }
+    };
+    try {
+      const res = await fetch(
+        `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const item of data?.response?.store_items || []) {
+        if (!item.appid || !item.name) continue;
+        const opt = item.best_purchase_option || item.purchase_options?.[0];
+        const finalCents = opt?.final_price_in_cents ? parseInt(opt.final_price_in_cents, 10) : null;
+        const origCents = opt?.original_price_in_cents ? parseInt(opt.original_price_in_cents, 10) : null;
+        out.set(item.appid, {
+          appId: item.appid,
+          name: item.name,
+          price: finalCents != null ? finalCents / 100 : null,
+          originalPrice: origCents != null ? origCents / 100 : null,
+          discount: opt?.discount_pct || 0,
+          currency: null // валюта угадывается клиентом по региону, formatted-строки не парсим
+        });
+      }
+    } catch (e) {
+      console.error("GetItems chunk error:", e);
+    }
+  }
+  return out;
+}
+
 // Helper to search Steam for games
 async function searchSteamGames(query: string) {
   try {
@@ -343,6 +436,124 @@ Deno.serve(async (req) => {
         JSON.stringify(results),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Deals: горящие скидки дня для первого экрана
+    // GET /api/deals?cc=ru — featuredcategories specials, кэш 1ч
+    if (req.method === "GET" && (pathname === "/api/deals" || pathname === "/deals")) {
+      if (!await checkRateLimit(clientIp(req), "deals", 60, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const cc = (url.searchParams.get("cc") || "ru").toLowerCase();
+      const cacheKey = `deals:${cc}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      try {
+        const res = await fetch(`https://store.steampowered.com/api/featuredcategories?cc=${cc}&l=${cc === "ru" ? "russian" : "english"}`);
+        if (!res.ok) throw new Error(`featuredcategories ${res.status}`);
+        const fc = await res.json();
+        // specials — горящие скидки; fallback — top_sellers если specials пуст
+        const pick = (section: any, discountedOnly: boolean) =>
+          (section?.items || [])
+            .filter((it: any) => it.id && it.name && (!discountedOnly || it.discounted))
+            .map((it: any) => ({
+              appId: it.id,
+              name: it.name,
+              price: typeof it.final_price === "number" ? it.final_price / 100 : null,
+              originalPrice: typeof it.original_price === "number" ? it.original_price / 100 : null,
+              discount: it.discount_percent || 0,
+              currency: it.currency || null
+            }));
+        let games = pick(fc.specials, true);
+        const source = games.length > 0 ? "specials" : "top_sellers";
+        if (games.length === 0) games = pick(fc.top_sellers, false);
+        const payload = { games, source, cc };
+        cacheSet(cacheKey, payload, 3600);
+        return new Response(JSON.stringify(payload), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e: any) {
+        console.error("deals:", e);
+        return new Response(
+          JSON.stringify({ error: "Failed to load deals", games: [] }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Wishlist import: GET /api/wishlist?profile=<url|vanity|id64>&cc=ru
+    // Резолв vanity без ключа (XML-профиль), официальный IWishlistService,
+    // батч-обогащение GetItems. Кэш 6ч.
+    if (req.method === "GET" && (pathname === "/api/wishlist" || pathname === "/wishlist")) {
+      if (!await checkRateLimit(clientIp(req), "wishlist", 20, 60)) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const raw = url.searchParams.get("profile") || "";
+      const cc = (url.searchParams.get("cc") || "ru").toLowerCase();
+      const parsed = parseSteamInput(raw);
+      if (!parsed) {
+        return new Response(
+          JSON.stringify({ error: "invalid_input", games: [] }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const id64 = parsed.kind === "id64" ? parsed.value : await resolveVanity(parsed.value);
+        if (!id64) {
+          return new Response(
+            JSON.stringify({ error: "profile_not_found", games: [] }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const cacheKey = `wishlist:${id64}:${cc}`;
+        const cached = cacheGet(cacheKey);
+        if (cached) {
+          return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const wres = await fetch(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${id64}&format=json`);
+        if (!wres.ok) throw new Error(`GetWishlist ${wres.status}`);
+        const wdata = await wres.json();
+        const items: any[] = wdata?.response?.items || [];
+        if (items.length === 0) {
+          // Пусто — приватный вишлист или реально пустой: различить не можем,
+          // UI ведёт юзера в настройки приватности
+          return new Response(
+            JSON.stringify({ error: "private_or_empty", games: [], steamId64: id64 }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // priority = порядок юзера в вишлисте (меньше = выше)
+        const sorted = [...items].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
+        const appIds = sorted.map((it: any) => it.appid).filter(Boolean).slice(0, 300);
+        const enriched = await enrichSteamApps(appIds, cc, cc === "ru" ? "russian" : "english");
+        const games = appIds.map((appid, i) => {
+          const e = enriched.get(appid);
+          return {
+            appId: appid,
+            name: e?.name || `App ${appid}`,
+            priority: i + 1,
+            price: e?.price ?? null,
+            originalPrice: e?.originalPrice ?? null,
+            discount: e?.discount || 0,
+            currency: e?.currency ?? null
+          };
+        }).filter(g => enriched.has(g.appId)); // игры без имени (удалённые из стора) — пропускаем
+        const payload = { games, steamId64: id64, count: games.length };
+        cacheSet(cacheKey, payload, 6 * 3600);
+        return new Response(JSON.stringify(payload), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e: any) {
+        console.error("wishlist:", e);
+        return new Response(
+          JSON.stringify({ error: "fetch_failed", games: [] }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Get game mapping

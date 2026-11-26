@@ -1,6 +1,6 @@
 {
-  "name": "Steam Roulette — pick a random game",
-  "short_name": "Steam Roulette",
+  "name": "PileSpin — steam roulette: pick a random game",
+  "short_name": "PileSpin",
   "description": "Spin a wheel over your game list. Live Steam prices on every sector, shareable links, no sign-up.",
   "start_url": "/steam-roulette/",
   "scope": "/steam-roulette/",

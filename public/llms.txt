@@ -1,4 +1,4 @@
-# Steam Roulette
+# PileSpin
 
 > Free web app that picks a random game from your list — spin a wheel, get a winner. Live Steam prices and discounts, shareable links, English/Russian UI. No sign-up, data stays in the browser.
 

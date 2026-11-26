@@ -118,7 +118,7 @@ export const DEFAULT_SETTINGS: Settings = {
     volume: 0.5
   },
   titles: {
-    main: defaultLocale === 'ru' ? 'СТИМ-РУЛЕТКА' : 'STEAM ROULETTE',
+    main: 'PILESPIN',
     subtitle: defaultLocale === 'ru' ? 'Крути лудик' : 'Spin it, pick it'
   }
 };

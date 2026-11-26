@@ -285,3 +285,47 @@ export async function getMappingSuggestions(gameName: string): Promise<{ existin
     return { existing: null, suggestions: [] };
   }
 }
+
+export interface DealsGame {
+  appId: number;
+  name: string;
+  price: number | null;
+  originalPrice: number | null;
+  discount: number;
+  currency: string | null;
+}
+
+// Горящие скидки дня для первого экрана (deals-режим)
+export async function fetchDeals(region: string): Promise<DealsGame[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/deals?cc=${encodeURIComponent(region)}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.games) ? data.games : [];
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+    return [];
+  }
+}
+
+export interface WishlistResult {
+  games: DealsGame[];
+  error?: 'invalid_input' | 'profile_not_found' | 'private_or_empty' | 'fetch_failed';
+  steamId64?: string;
+}
+
+// Импорт вишлиста по ссылке на профиль / vanity / steamid64
+export async function fetchWishlist(profile: string, region: string): Promise<WishlistResult> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/wishlist?profile=${encodeURIComponent(profile)}&cc=${encodeURIComponent(region)}`
+    );
+    const data = await response.json().catch(() => null);
+    if (!data) return { games: [], error: 'fetch_failed' };
+    if (data.error) return { games: [], error: data.error, steamId64: data.steamId64 };
+    return { games: Array.isArray(data.games) ? data.games : [], steamId64: data.steamId64 };
+  } catch (error) {
+    console.error('Error fetching wishlist:', error);
+    return { games: [], error: 'fetch_failed' };
+  }
+}

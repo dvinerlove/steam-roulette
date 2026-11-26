@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Game, Settings, HistoryItem } from './types';
 import { getGameColor, DEFAULT_GAMES } from './constants';
 import { DEFAULT_SETTINGS, mergeSettings } from './types';
-import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, type MappingSuggestion } from './utils/steam';
+import { fetchSteamPrice, searchSteamGames, getGameMapping, saveGameMapping, preloadPrices, getMappingSuggestions, transliterateRussian, normalizeStringForComparison, fetchDeals, fetchWishlist, type MappingSuggestion, type DealsGame } from './utils/steam';
 import type { SteamSearchResult } from './utils/steam';
 import { useAudio } from './utils/audio';
 import { t, formatPrice } from './i18n';
@@ -63,6 +63,10 @@ function App() {
   const [listCollapsed, setListCollapsed] = useState(() => localStorage.getItem('fortuneWheelListCollapsed') === '1');
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
+  const [steamProfileInput, setSteamProfileInput] = useState('');
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistResult, setWishlistResult] = useState<{ games: DealsGame[] } | null>(null);
+  const [wishlistError, setWishlistError] = useState<string | null>(null);
   const [confirmClearGamesOpen, setConfirmClearGamesOpen] = useState(false);
   const [steamSearchResults, setSteamSearchResults] = useState<SteamSearchResult[]>([]);
   const [showSteamSearchResultsModal, setShowSteamSearchResultsModal] = useState(false);
@@ -581,7 +585,14 @@ function App() {
       const params = new URLSearchParams(window.location.search);
       const shareId = params.get('share');
       const stateParam = params.get('state');
-      
+
+      // Deals-режим: на самом первом визите колесо наполняется горящими скидками.
+      // Запрос стартует сразу — параллельно с загрузкой шаринга, без потери времени
+      const isFirstVisit = !shareId && !stateParam && localStorage.getItem('fortuneWheelGames') === null;
+      const dealsPromise = isFirstVisit
+        ? fetchDeals(loadedSettings.steam.region).catch(() => [])
+        : null;
+
       if (shareId) {
         // First try API
         try {
@@ -657,9 +668,35 @@ function App() {
         const savedGames = loadJson('fortuneWheelGames');
         const savedHistory = loadJson('fortuneWheelHistory');
         if (savedSettings) loadedSettings = mergeSettings(savedSettings);
+        // Ребрендинг: дефолтный заголовок старого имени мигрируем в PileSpin.
+        // Кастомный пользовательский заголовок не трогаем.
+        if (loadedSettings.titles.main === 'STEAM ROULETTE' || loadedSettings.titles.main === 'СТИМ-РУЛЕТКА') {
+          loadedSettings = { ...loadedSettings, titles: { ...loadedSettings.titles, main: 'PILESPIN' } };
+        }
         if (localStorage.getItem('fortuneWheelGames') === null) {
-          // Совсем первый визит — подсев демо-игр, чтобы колесо не было пустым
-          loadedGames = DEFAULT_GAMES.map((g, i) => ({ id: uid(), ...g, color: getGameColor(i) }));
+          // Совсем первый визит — колесо из горящих скидок вместо демо-игр.
+          // Кап по времени: если сеть медленная — демо, ценность не должна
+          // стоить первому рендеру больше ~1.2с
+          const deals = await Promise.race([
+            dealsPromise || Promise.resolve([]),
+            new Promise<never[]>(r => setTimeout(() => r([]), 2000))
+          ]);
+          if (deals.length >= 4) {
+            loadedGames = deals.slice(0, 10).map((d, i) => ({
+              id: uid(),
+              name: d.name,
+              appId: String(d.appId),
+              color: getGameColor(i),
+              price: d.price != null ? formatPrice(d.price, loadedSettings.steam.currency, loadedSettings.locale) : undefined,
+              discount: d.discount > 0 ? `-${d.discount}%` : undefined,
+              originalPrice: d.originalPrice != null && d.discount > 0
+                ? formatPrice(d.originalPrice, loadedSettings.steam.currency, loadedSettings.locale)
+                : undefined,
+            }));
+          } else {
+            // подсев демо-игр, чтобы колесо не было пустым
+            loadedGames = DEFAULT_GAMES.map((g, i) => ({ id: uid(), ...g, color: getGameColor(i) }));
+          }
         } else if (Array.isArray(savedGames)) {
           loadedGames = savedGames.map(normalizeGame);
         }
@@ -781,7 +818,7 @@ function App() {
 
   // Заголовок вкладки следует за настраиваемым заголовком
   useEffect(() => {
-    document.title = settings.titles.main || 'Steam Roulette';
+    document.title = settings.titles.main || 'PileSpin';
     document.documentElement.lang = settings.locale;
   }, [settings.titles.main, settings.locale]);
 
@@ -922,6 +959,48 @@ function App() {
     }));
     setGames(prev => [...prev, ...newGames]);
     setImportText('');
+    setImportOpen(false);
+  };
+
+  const wishlistToGames = (list: DealsGame[], offset: number): Game[] =>
+    list.map((g, i) => ({
+      id: uid(),
+      name: g.name,
+      appId: String(g.appId),
+      color: getGameColor(offset + i),
+      price: g.price != null ? formatPrice(g.price, settings.steam.currency, settings.locale) : undefined,
+      discount: g.discount > 0 ? `-${g.discount}%` : undefined,
+      originalPrice: g.originalPrice != null && g.discount > 0
+        ? formatPrice(g.originalPrice, settings.steam.currency, settings.locale)
+        : undefined,
+    }));
+
+  const handleImportWishlist = async () => {
+    if (!steamProfileInput.trim() || wishlistLoading) return;
+    setWishlistLoading(true);
+    setWishlistError(null);
+    setWishlistResult(null);
+    const res = await fetchWishlist(steamProfileInput.trim(), settings.steam.region);
+    setWishlistLoading(false);
+    if (res.error) {
+      setWishlistError(res.error);
+      return;
+    }
+    if (res.games.length === 0) {
+      setWishlistError('private_or_empty');
+      return;
+    }
+    setWishlistResult({ games: res.games });
+  };
+
+  const applyWishlist = (mode: 'replace' | 'append') => {
+    if (!wishlistResult) return;
+    const offset = mode === 'replace' ? 0 : games.length;
+    const newGames = wishlistToGames(wishlistResult.games, offset);
+    setGames(prev => mode === 'replace' ? newGames : [...prev, ...newGames]);
+    setWishlistResult(null);
+    setWishlistError(null);
+    setSteamProfileInput('');
     setImportOpen(false);
   };
 
@@ -1610,7 +1689,58 @@ function App() {
                   <X size={24} />
                 </button>
               </div>
-              <p className="text-slate-400 mb-4">{t(settings.locale, 'import.hint')}</p>
+              {/* Импорт из Steam-профиля: вишлист с живыми ценами и скидками */}
+              <div className="mb-5">
+                <p className="text-slate-300 font-medium mb-2">{t(settings.locale, 'import.steamTitle')}</p>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={steamProfileInput}
+                    onChange={(e) => { setSteamProfileInput(e.target.value); setWishlistError(null); setWishlistResult(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleImportWishlist(); }}
+                    placeholder={t(settings.locale, 'import.profilePlaceholder')}
+                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-base lg:text-sm"
+                  />
+                  <button
+                    onClick={() => void handleImportWishlist()}
+                    disabled={wishlistLoading || !steamProfileInput.trim()}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {wishlistLoading ? t(settings.locale, 'import.loading') : t(settings.locale, 'import.wishlist')}
+                  </button>
+                </div>
+                {wishlistError && (
+                  <p className="text-sm text-amber-400/90 mb-1">
+                    {t(settings.locale,
+                      wishlistError === 'invalid_input' ? 'import.errInvalid'
+                      : wishlistError === 'profile_not_found' ? 'import.errNotFound'
+                      : wishlistError === 'private_or_empty' ? 'import.errPrivate'
+                      : 'import.errFetch')}
+                  </p>
+                )}
+                {wishlistResult && (
+                  <div className="bg-slate-700/60 border border-slate-600 rounded-lg p-3">
+                    <p className="text-sm text-emerald-400 mb-2">
+                      {t(settings.locale, 'import.found', { count: wishlistResult.games.length })}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => applyWishlist('replace')}
+                        className="flex-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors"
+                      >
+                        {t(settings.locale, 'import.replace')}
+                      </button>
+                      <button
+                        onClick={() => applyWishlist('append')}
+                        className="flex-1 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-sm rounded-lg transition-colors"
+                      >
+                        {t(settings.locale, 'import.append')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-slate-400 mb-2 text-sm">{t(settings.locale, 'import.manualTitle')}</p>
               <textarea
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
